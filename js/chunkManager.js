@@ -69,6 +69,10 @@ export default class ChunkManager {
     this.chunks = new Map(); // key -> { cx, cz, meshes, top, data, skyLight, blockLight, builtAtTime }
     this.showBorders = false;
     this._borderHelpers = new Map(); // key -> Box3Helper
+    this._playerChunkX = null; // Current player chunk X
+    this._playerChunkZ = null; // Current player chunk Z
+    this._playerBorderHelper = null; // Border helper for player chunk
+    this._subGridHelpers = []; // Array of sub-grid helpers
     this._timeOfDay = 0.5; // Default to noon (0=midnight, 0.5=noon, 1=midnight)
     this._cycleStart = performance.now() / 1000; // For time tracking
     this._debugLightLogged = false; // Debug flag to limit logging
@@ -373,6 +377,22 @@ export default class ChunkManager {
     const fKey = this._key(cx, cz);
     if (this.chunks.has(fKey)) return;
 
+    // Check if chunk is still within view distance before adding it
+    // This prevents chunks from being added and immediately removed (flickering)
+    if (this._playerChunkX !== null && this._playerChunkZ !== null) {
+      const dx = cx - this._playerChunkX;
+      const dz = cz - this._playerChunkZ;
+      const distanceSquared = dx * dx + dz * dz;
+      const maxDistanceSquared = this.viewDistance * this.viewDistance;
+      
+      if (distanceSquared > maxDistanceSquared) {
+        if (DEBUG.logChunkLoading) {
+          console.log(`ChunkManager: Skipping chunk ${cx},${cz} - outside view distance (${Math.sqrt(distanceSquared).toFixed(1)} > ${this.viewDistance})`);
+        }
+        return;
+      }
+    }
+
     // Compute top array for collision and rendering (highest non-air block)
     const top = new Int16Array(CHUNK_SIZE * CHUNK_SIZE);
     for (let x = 0; x < CHUNK_SIZE; x++) {
@@ -403,18 +423,10 @@ export default class ChunkManager {
     this.scene.add(group);
     const key = this._key(cx, cz);
     this.chunks.set(key, { cx, cz, group, top, data: chunk.data, skyLight, blockLight, builtAtTime: this._timeOfDay });
-    if (this.showBorders) {
-      try {
-        const box = new THREE.Box3(
-          new THREE.Vector3(chunkWorldX, MIN_Y * bs, chunkWorldZ),
-          new THREE.Vector3(chunkWorldX + CHUNK_SIZE * bs, MAX_Y * bs, chunkWorldZ + CHUNK_SIZE * bs)
-        );
-        const helper = new THREE.Box3Helper(box, 0xff0000);
-        this.scene.add(helper);
-        this._borderHelpers.set(key, helper);
-      } catch (e) {
-        console.warn('Failed to create Box3Helper for chunk borders', e);
-      }
+    
+    // Update player chunk borders if this is the player's current chunk
+    if (cx === this._playerChunkX && cz === this._playerChunkZ && this.showBorders) {
+      this._updatePlayerChunkBorders();
     }
   }
 
@@ -944,13 +956,9 @@ export default class ChunkManager {
     
     this.scene.remove(rec.group);
     this.chunks.delete(key);
-    // Remove border helper if present
-    const helper = this._borderHelpers.get(key);
-    if (helper) {
-      this.scene.remove(helper);
-      if (helper.geometry) helper.geometry.dispose();
-      if (helper.material) helper.material.dispose();
-      this._borderHelpers.delete(key);
+    // Clear player borders if this was the player's chunk
+    if (cx === this._playerChunkX && cz === this._playerChunkZ) {
+      this._clearPlayerBorders();
     }
     if (DEBUG.logChunkLoading) console.log(`_unloadChunk: chunk ${cx},${cz} unloaded and removed`);
   }
@@ -963,8 +971,14 @@ export default class ChunkManager {
     const centerChunkX = Math.floor(centerWorldX / (CHUNK_SIZE * bs));
     const centerChunkZ = Math.floor(centerWorldZ / (CHUNK_SIZE * bs));
 
+    // Update player chunk borders if player moved to a different chunk
+    if (this._playerChunkX !== centerChunkX || this._playerChunkZ !== centerChunkZ) {
+      this._playerChunkX = centerChunkX;
+      this._playerChunkZ = centerChunkZ;
+      this._updatePlayerChunkBorders();
+    }
+
     const radius = this.viewDistance;
-    const hysteresis = RENDER.chunkHysteresis ?? 1; // extra margin before unloading
     const wanted = new Set();
     
     for (let cx = centerChunkX - radius; cx <= centerChunkX + radius; cx++) {
@@ -979,13 +993,49 @@ export default class ChunkManager {
         }
       }
     }
-    
-    // unload chunks only if they are outside radius + hysteresis
-    for (const key of Array.from(this.chunks.keys())) {
-      const [cx, cz] = key.split(',').map(Number);
-      if (Math.abs(cx - centerChunkX) > radius + hysteresis || Math.abs(cz - centerChunkZ) > radius + hysteresis) {
-        this._unloadChunk(cx, cz);
+
+    // Unload chunks outside view distance
+    const chunksToUnload = [];
+    for (const [key, chunk] of this.chunks) {
+      if (!wanted.has(key)) {
+        chunksToUnload.push({ cx: chunk.cx, cz: chunk.cz });
       }
+    }
+    
+    // Unload chunks that are too far away
+    for (const { cx, cz } of chunksToUnload) {
+      this._unloadChunk(cx, cz);
+    }
+    
+    if (DEBUG.logChunkLoading && chunksToUnload.length > 0) {
+      console.log(`ChunkManager: unloaded ${chunksToUnload.length} chunks outside view distance`);
+    }
+
+    // Clean up pending worker requests for chunks outside view distance
+    if (this._chunkWorker && this._pendingRequests.size > 0) {
+      const pendingToCancel = [];
+      for (const [key, request] of this._pendingRequests) {
+        if (!wanted.has(key)) {
+          pendingToCancel.push(key);
+        }
+      }
+      
+      for (const key of pendingToCancel) {
+        this._pendingRequests.delete(key);
+      }
+      
+      if (DEBUG.logChunkLoading && pendingToCancel.length > 0) {
+        console.log(`ChunkManager: cancelled ${pendingToCancel.length} pending worker requests outside view distance`);
+      }
+    }
+
+    // Clean up load queue for chunks outside view distance
+    const originalQueueLength = this._loadQueue.length;
+    this._loadQueue = this._loadQueue.filter(item => wanted.has(item.key));
+    const removedFromQueue = originalQueueLength - this._loadQueue.length;
+    
+    if (DEBUG.logChunkLoading && removedFromQueue > 0) {
+      console.log(`ChunkManager: removed ${removedFromQueue} items from load queue outside view distance`);
     }
   }
 
@@ -1173,57 +1223,77 @@ export default class ChunkManager {
     this.scene.add(newGroup);
     rec.group = newGroup;
     rec.builtAtTime = this._timeOfDay;
-    // Recreate border helper for rebuilt chunk if enabled
-    const oldHelper = this._borderHelpers.get(key);
-    if (oldHelper) {
-      this.scene.remove(oldHelper);
-      if (oldHelper.geometry) oldHelper.geometry.dispose();
-      if (oldHelper.material) oldHelper.material.dispose();
-      this._borderHelpers.delete(key);
-    }
-    if (this.showBorders) {
-      try {
-        const box = new THREE.Box3(
-          new THREE.Vector3(chunkWorldX, MIN_Y * bs, chunkWorldZ),
-          new THREE.Vector3(chunkWorldX + CHUNK_SIZE * bs, MAX_Y * bs, chunkWorldZ + CHUNK_SIZE * bs)
-        );
-        const helper = new THREE.Box3Helper(box, 0xff0000);
-        this.scene.add(helper);
-        this._borderHelpers.set(key, helper);
-      } catch (e) {
-        console.warn('Failed to recreate Box3Helper for chunk borders', e);
-      }
+    // Update player chunk borders if this is the player's current chunk
+    if (cx === this._playerChunkX && cz === this._playerChunkZ && this.showBorders) {
+      this._updatePlayerChunkBorders();
     }
   }
 
-  // Toggle or set chunk border visibility.
+  // Toggle or set chunk border visibility for player's current chunk only
   showChunkBorders(enable = true) {
     const want = !!enable;
     if (want === this.showBorders) return;
     this.showBorders = want;
-    if (this.showBorders) {
-      for (const [key, rec] of this.chunks.entries()) {
-        if (this._borderHelpers.has(key)) continue;
-        try {
-          const box = new THREE.Box3(
-            new THREE.Vector3(rec.cx * CHUNK_SIZE * this.blockSize, MIN_Y * this.blockSize, rec.cz * CHUNK_SIZE * this.blockSize),
-            new THREE.Vector3((rec.cx + 1) * CHUNK_SIZE * this.blockSize, MAX_Y * this.blockSize, (rec.cz + 1) * CHUNK_SIZE * this.blockSize)
-          );
-          const helper = new THREE.Box3Helper(box, 0xff0000);
-          this.scene.add(helper);
-          this._borderHelpers.set(key, helper);
-        } catch (e) {
-          console.warn('Failed to create Box3Helper for chunk borders', e);
-        }
+    this._updatePlayerChunkBorders();
+  }
+
+  // Update player chunk borders and sub-grids
+  _updatePlayerChunkBorders() {
+    // Clear existing player chunk borders and sub-grids
+    this._clearPlayerBorders();
+
+    if (!this.showBorders || this._playerChunkX === null || this._playerChunkZ === null) return;
+    const bs = this.blockSize;
+    const cx = this._playerChunkX;
+    const cz = this._playerChunkZ;
+    this._createSubGrids(cx, cz, bs);
+    
+  }
+
+  // Create sub-grids within the player's chunk
+  _createSubGrids(cx, cz, bs) {
+    const chunkWorldX = cx * CHUNK_SIZE * bs;
+    const chunkWorldZ = cz * CHUNK_SIZE * bs;
+    const gridSize = 16;
+    const subChunkSize = CHUNK_SIZE / gridSize;
+
+    for (let gx = 0; gx < gridSize; gx++) {
+      for (let gz = 0; gz < gridSize; gz++) {
+      if (gx !== 0 && gz !== 0 && gx !== gridSize - 1 && gz !== gridSize - 1) continue;
+
+      const minX = chunkWorldX + gx * subChunkSize * bs;
+      const maxX = chunkWorldX + (gx + 1) * subChunkSize * bs;
+      const minZ = chunkWorldZ + gz * subChunkSize * bs;
+      const maxZ = chunkWorldZ + (gz + 1) * subChunkSize * bs;
+
+      const subBox = new THREE.Box3(
+        new THREE.Vector3(minX, MIN_Y * bs, minZ),
+        new THREE.Vector3(maxX, MAX_Y * bs, maxZ)
+      );
+      const subHelper = new THREE.Box3Helper(subBox, 0x00ff00);
+      this.scene.add(subHelper);
+      this._subGridHelpers.push(subHelper);
       }
-    } else {
-      for (const [key, helper] of this._borderHelpers.entries()) {
-        this.scene.remove(helper);
-        if (helper.geometry) helper.geometry.dispose();
-        if (helper.material) helper.material.dispose();
-      }
-      this._borderHelpers.clear();
     }
+  }
+
+  // Clear all player border helpers
+  _clearPlayerBorders() {
+    // Clear main border
+    if (this._playerBorderHelper) {
+      this.scene.remove(this._playerBorderHelper);
+      if (this._playerBorderHelper.geometry) this._playerBorderHelper.geometry.dispose();
+      if (this._playerBorderHelper.material) this._playerBorderHelper.material.dispose();
+      this._playerBorderHelper = null;
+    }
+
+    // Clear sub-grids
+    for (const helper of this._subGridHelpers) {
+      this.scene.remove(helper);
+      if (helper.geometry) helper.geometry.dispose();
+      if (helper.material) helper.material.dispose();
+    }
+    this._subGridHelpers = [];
   }
 
   toggleChunkBorders() { this.showChunkBorders(!this.showBorders); }
@@ -1307,26 +1377,9 @@ export default class ChunkManager {
     rec.group = newGroup;
     rec.builtAtTime = this._timeOfDay;
 
-    // Recreate border helper if enabled
-    const oldHelper = this._borderHelpers.get(key);
-    if (oldHelper) {
-      this.scene.remove(oldHelper);
-      if (oldHelper.geometry) oldHelper.geometry.dispose();
-      if (oldHelper.material) oldHelper.material.dispose();
-      this._borderHelpers.delete(key);
-    }
-    if (this.showBorders) {
-      try {
-        const box = new THREE.Box3(
-          new THREE.Vector3(chunkWorldX, MIN_Y * bs, chunkWorldZ),
-          new THREE.Vector3(chunkWorldX + CHUNK_SIZE * bs, MAX_Y * bs, chunkWorldZ + CHUNK_SIZE * bs)
-        );
-        const helper = new THREE.Box3Helper(box, 0xff0000);
-        this.scene.add(helper);
-        this._borderHelpers.set(key, helper);
-      } catch (e) {
-        console.warn('Failed to create Box3Helper for chunk borders', e);
-      }
+    // Update player chunk borders if this is the player's current chunk
+    if (cx === this._playerChunkX && cz === this._playerChunkZ && this.showBorders) {
+      this._updatePlayerChunkBorders();
     }
   }
 
