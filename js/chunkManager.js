@@ -424,9 +424,32 @@ export default class ChunkManager {
     const key = this._key(cx, cz);
     this.chunks.set(key, { cx, cz, group, top, data: chunk.data, skyLight, blockLight, builtAtTime: this._timeOfDay });
     
+    // Rebuild neighboring chunks to properly cull faces that are now hidden by this new chunk
+    this._rebuildNeighborChunks(cx, cz);
+    
     // Update player chunk borders if this is the player's current chunk
     if (cx === this._playerChunkX && cz === this._playerChunkZ && this.showBorders) {
       this._updatePlayerChunkBorders();
+    }
+  }
+
+  // Rebuild neighboring chunks when a new chunk is loaded to properly cull border faces
+  _rebuildNeighborChunks(cx, cz) {
+    // Check all 4 neighboring chunks (N, S, E, W)
+    const neighbors = [
+      [cx + 1, cz],     // East
+      [cx - 1, cz],     // West
+      [cx, cz + 1],     // South
+      [cx, cz - 1]      // North
+    ];
+    
+    for (const [nx, nz] of neighbors) {
+      const neighborKey = this._key(nx, nz);
+      const neighbor = this.chunks.get(neighborKey);
+      if (neighbor) {
+        // Rebuild the neighbor chunk mesh to properly cull faces now hidden by this new chunk
+        this._rebuildChunkMeshOnly(nx, nz);
+      }
     }
   }
 
@@ -956,6 +979,10 @@ export default class ChunkManager {
     
     this.scene.remove(rec.group);
     this.chunks.delete(key);
+    
+    // Rebuild neighboring chunks to show faces that were hidden by this chunk
+    this._rebuildNeighborChunks(cx, cz);
+    
     // Clear player borders if this was the player's chunk
     if (cx === this._playerChunkX && cz === this._playerChunkZ) {
       this._clearPlayerBorders();
