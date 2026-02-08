@@ -90,11 +90,11 @@ export const PLAYER = {
 
 export const PHYSICS = {
   gravity: -28.42,          // blocks/s² (negative = down)
-  jumpSpeed: 80.436,          // initial jump velocity (blocks/s)
+  jumpSpeed: 8.436,          // initial jump velocity (blocks/s)
   terminalVelocity: -50, // max fall speed (blocks/s)
   
   // Movement
-  maxSpeed: 40.317,           // max horizontal speed (blocks/s)
+  maxSpeed: 4.317,           // max horizontal speed (blocks/s)
   sprintMultiplier: 1.428, // speed multiplier when sprinting
   crouchMultiplier: 0.3, // speed multiplier when crouching
   
