@@ -48,7 +48,13 @@ export function main() {
   let fpsDisplay = null;
 
   const blockSize = 1;
-  const cm = new ChunkManager(scene, { seed: SEED, blockSize, viewDistance: gameSettings.viewDistance });
+  const debugOverlay = createDebugOverlay();
+  let showDebug = false;
+  let lastDebugUpdate = 0;
+  const debugUpdateInterval = 250;
+  window.addEventListener('keydown', (e) => {if (e.code === 'F3') { debugOverlay.toggle(); showDebug = !showDebug; }});
+
+  const cm = new ChunkManager(scene, { seed: SEED, blockSize, viewDistance: gameSettings.viewDistance, debugOverlay });
 
   let waterPhysics = null;
   try {
@@ -58,11 +64,7 @@ export function main() {
     console.error('Error stack:', error.stack);
   }
 
-  const debugOverlay = createDebugOverlay();
-  let showDebug = false;
-  let lastDebugUpdate = 0;
-  const debugUpdateInterval = 250;
-  window.addEventListener('keydown', (e) => {if (e.code === 'F3') { debugOverlay.toggle(); showDebug = !showDebug; }});
+  
 
   const raycaster = new THREE.Raycaster();
   const tempLocalPoint = new THREE.Vector3();

@@ -160,6 +160,6 @@ export const COLORS = {
 // ============================================
 
 export const DEBUG = {
-  logChunkLoading: false,   // log chunk load/unload
+  logChunkLoading: true,   // log chunk load/unload
   showStartupInfo: true,    // show startup console logs
 };

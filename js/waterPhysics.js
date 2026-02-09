@@ -1,41 +1,22 @@
-// waterPhysics.js
-// Advanced water physics system for Minecraft clone
-// Handles water flow, spreading, interaction with blocks, and visual effects
-
 import * as THREE from './three.module.js';
 import { CHUNK_SIZE, HEIGHT, MIN_Y } from './chunkGen.js';
 
-// ============================================
-// WATER PHYSICS CONFIGURATION
-// Based on Minecraft Wiki specifications
-// ============================================
-
 export const WATER_CONFIG = {
-  // Flow mechanics (Minecraft: 5 game ticks per block, 20 ticks/sec = 0.25 sec/block)
   maxFlowDistance: 7,        // Water spreads 7 blocks horizontally from source
   flowSpeed: 0.35,           // Slightly slower for performance (was 0.25)
   verticalFlowSpeed: 0.0,    // Instant vertical flow (falls immediately)
   maxSpreadIterations: 1,    // Reduced from 2 for performance
-  
-  // Water levels (Minecraft: 0=source, 1-7=flowing with decreasing depth)
-  // Note: In Minecraft blockstate, 0=source, 1-7=flow levels (7 is shallowest)
-  // We use 7=source, 0=shallowest for easier height calculations
-  sourceLevel: 7,            // Full water source block (level 0 in MC blockstate = 7 here)
+  sourceLevel: 7,            // Full water source block
   minFlowLevel: 1,           // Minimum water level before disappearing
-  
-  // Source block creation (Minecraft: 2+ adjacent sources on solid block creates new source)
   sourceCreationEnabled: true,
   minAdjacentSources: 2,     // Minimum adjacent source blocks to create new source
-  
-  // Visual properties
   waveSpeed: 0.5,            // Speed of wave animation
   waveHeight: 0.04,          // Height of waves (subtle)
-  flowAnimSpeed: 1.0,        // Speed of flow texture animation (~20fps like MC)
+  flowAnimSpeed: 1.0,        // Speed of flow texture animation
   transparency: 0.65,        // Water transparency (0-1)
   refractionStrength: 0.02,  // Water distortion effect
   animationFPS: 10,          // Reduced animation FPS for performance (was ~20)
-  
-  // Block heights based on level (Minecraft accurate)
+
   // Level 7 (source) = 1 block, Level 1 = 0.125 blocks
   levelHeights: {
     7: 1.0,      // Source block - full height
@@ -47,40 +28,24 @@ export const WATER_CONFIG = {
     1: 0.25,     // 2/8 height (minimum visible)
     0: 0.125,    // 1/8 height (essentially gone)
   },
-  
-  // Swimming physics (Minecraft accurate)
   swimSpeed: 0.4,            // Base movement speed multiplier in water
   swimSpeedWithDepthStrider: 0.91, // With Depth Strider III
   sinkSpeed: 0.02,           // Sink rate when not swimming (blocks/tick)
   buoyancy: 0.04,            // Upward force when pressing jump in water
   swimBuoyancy: 0.08,        // Upward force when actively swimming
   drag: 0.8,                 // Movement drag in water
-  
-  // Current/pushing physics (Minecraft: ~1.39 m/s = 25 blocks per 18 seconds)
   currentSpeed: 1.39,        // Speed at which water current pushes entities (blocks/sec)
   currentStrength: 0.014,    // Force applied per tick by water current
-  
-  // Drowning mechanics (Minecraft: 15 second breath, then 2 HP/second)
   breathDuration: 15.0,      // Seconds of breath before drowning starts
   drowningDamage: 2,         // Hearts of damage per second while drowning
   drowningInterval: 1.0,     // Seconds between drowning damage ticks
-  
-  // Submerged mining (Minecraft: 5x slower on ground, 25x slower floating)
   miningSpeedMultiplierGround: 0.2,   // 5x slower
   miningSpeedMultiplierFloating: 0.04, // 25x slower
-  
-  // Fall damage (water negates all fall damage at any depth)
   preventsFallDamage: true,
-  
-  // Particle effects
   particleSpawnRate: 0.15,   // Probability of spawning drip particles
   bubbleSpawnRate: 0.08,     // Probability of spawning bubble particles
   splashParticleCount: 8,    // Particles when entity enters water
 };
-
-// ============================================
-// WATER BLOCK DATA STRUCTURE
-// ============================================
 
 export class WaterBlock {
   constructor(x, y, z, level = WATER_CONFIG.sourceLevel) {
@@ -90,11 +55,11 @@ export class WaterBlock {
     this.level = level;           // Water level (0-7, 7=source)
     this.isSource = level === WATER_CONFIG.sourceLevel;
     this.flowing = !this.isSource && level > 0;
-    this.isFalling = false;       // True if water is falling (Minecraft "falling" blockstate)
+    this.isFalling = false;
     this.needsUpdate = true;
     this.flowDirection = new THREE.Vector3(0, 0, 0); // Direction of current
     this.mesh = null;
-    this.scheduledRemoval = false; // Mark for removal when flow recalculates
+    this.scheduledRemoval = false;
   }
   
   setLevel(newLevel) {
@@ -109,7 +74,6 @@ export class WaterBlock {
     }
   }
   
-  // Get height using Minecraft-accurate level heights
   getHeight() {
     if (this.isFalling) {
       return 1.0; // Falling water is always full height
@@ -183,10 +147,9 @@ export class WaterPhysics {
     this.updateQueue = [];
     this.tickAccumulator = 0;
     this.lastUpdate = Date.now();
-    
-    // Flow tick counter (Minecraft uses game ticks)
+
     this.flowTickTimer = 0;
-    this.ticksPerSecond = 20; // Minecraft runs at 20 ticks per second
+    this.ticksPerSecond = 20;
     
     // Water materials
     this.materials = this.createWaterMaterials();
@@ -207,10 +170,6 @@ export class WaterPhysics {
     // Fall damage prevention tracking
     this.wasInWaterLastFrame = false;
   }
-  
-  // ============================================
-  // MATERIAL CREATION
-  // ============================================
   
   createWaterMaterials() {
     try {
@@ -571,10 +530,7 @@ export class WaterPhysics {
   
   update(deltaTime) {
     try {
-      // Accumulate time for tick-based updates (Minecraft: 5 ticks per block spread)
       this.flowTickTimer += deltaTime;
-      
-      // Process water flow at Minecraft-accurate rate (5 ticks = 0.25 seconds)
       if (this.flowTickTimer >= WATER_CONFIG.flowSpeed) {
         this.processWaterFlow();
         this.flowTickTimer = 0;
@@ -601,8 +557,6 @@ export class WaterPhysics {
       while (newWaterCreated && iterations < maxIterations) {
         newWaterCreated = false;
         iterations++;
-        
-        // Process source block creation first (Minecraft: 2 adjacent sources = new source)
         if (WATER_CONFIG.sourceCreationEnabled) {
           this.processSourceCreation();
         }
@@ -613,12 +567,8 @@ export class WaterPhysics {
           
           try {
             const beforeCount = this.waterBlocks.size;
-            
-            // Priority: flow down first, then spread horizontally
             const flowedDown = this.flowDown(waterBlock);
-            
             if (!flowedDown) {
-              // Use weighted pathfinding for horizontal flow (Minecraft behavior)
               this.flowHorizontallyWeighted(waterBlock);
             }
             
@@ -638,9 +588,6 @@ export class WaterPhysics {
     }
   }
   
-  // Minecraft-accurate source block creation:
-  // A flowing water block adjacent to 2+ source blocks horizontally,
-  // sitting on a solid block or another source, becomes a source
   processSourceCreation() {
     const waterBlocksArray = Array.from(this.waterBlocks.values());
     
@@ -735,8 +682,6 @@ export class WaterPhysics {
         return;
       }
       
-      // Minecraft weighted flow: assign weights to each direction
-      // Weight = distance to nearest downward path (1000 if none found within 4 blocks)
       const directions = [
         { dx: 1, dz: 0, name: '+X' },
         { dx: -1, dz: 0, name: '-X' },
@@ -762,8 +707,7 @@ export class WaterPhysics {
       }
       
       if (flowWeights.length === 0) return;
-      
-      // Find minimum weight (Minecraft flows toward nearest drop)
+
       const minWeight = Math.min(...flowWeights.map(f => f.weight));
       
       // Flow in all directions with minimum weight
@@ -801,8 +745,6 @@ export class WaterPhysics {
     }
   }
   
-  // Calculate flow weight: shortest path to a downward drop within maxDepth
-  // Returns 1000 if no drop found (Minecraft behavior)
   calculateFlowWeight(x, y, z, maxDepth) {
     // BFS to find shortest path to a drop
     const visited = new Set();
@@ -898,7 +840,6 @@ export class WaterPhysics {
   }
   
   calculateFlowLevel(x, y, z) {
-    // Find nearest source block and calculate level (Minecraft style)
     let minDistance = WATER_CONFIG.maxFlowDistance + 1;
     
     for (const waterBlock of this.waterBlocks.values()) {
@@ -955,17 +896,10 @@ export class WaterPhysics {
     }
   }
   
-  // ============================================
-  // VISUAL ANIMATIONS
-  // ============================================
-  
   updateWaterAnimation(deltaTime) {
     const time = Date.now() * 0.001;
-    
-    // Animate sprite sheet frames (Minecraft-style animated textures)
-    // Each texture is a vertical strip of 32 frames
     this.animationTimer = (this.animationTimer || 0) + deltaTime;
-    const frameInterval = 0.05; // ~20 fps animation like Minecraft
+    const frameInterval = 0.05;
     
     if (this.animationTimer >= frameInterval) {
       this.animationTimer = 0;
@@ -1108,8 +1042,7 @@ export class WaterPhysics {
     }
     return waterBlock.flowDirection.clone();
   }
-  
-  // Apply Minecraft-accurate water physics to player velocity
+
   applyWaterPhysics(velocity, playerPosition, inputState = {}) {
     const inWater = this.isPlayerInWater(playerPosition);
     
@@ -1124,8 +1057,7 @@ export class WaterPhysics {
     
     const isSwimming = inputState.forward || inputState.jump;
     const isSneaking = inputState.crouch;
-    
-    // Apply water drag (Minecraft: reduces all velocities)
+
     velocity.multiplyScalar(WATER_CONFIG.drag);
     
     // Apply swim speed reduction to horizontal movement
@@ -1135,7 +1067,6 @@ export class WaterPhysics {
     // Get water current and apply pushing force
     const current = this.getWaterCurrentAt(playerPosition);
     if (current.lengthSq() > 0) {
-      // Minecraft: water pushes at ~1.39 m/s (25 blocks per 18 seconds)
       velocity.x += current.x * WATER_CONFIG.currentStrength;
       velocity.z += current.z * WATER_CONFIG.currentStrength;
       
@@ -1193,8 +1124,6 @@ export class WaterPhysics {
         }
       }
     } else {
-      // Restore breath when head is above water
-      // Minecraft: breath restores instantly when surfacing
       this.playerBreath = WATER_CONFIG.breathDuration;
       this.drowningTimer = 0;
     }
@@ -1219,8 +1148,6 @@ export class WaterPhysics {
     if (!this.isPlayerHeadSubmerged(playerPosition)) {
       return 1.0; // Not submerged, normal speed
     }
-    
-    // Minecraft: 5x slower on ground, 25x slower floating
     if (isOnGround) {
       return WATER_CONFIG.miningSpeedMultiplierGround;
     }
@@ -1230,14 +1157,10 @@ export class WaterPhysics {
   getWaterDragMultiplier() {
     return WATER_CONFIG.drag;
   }
-  
-  // Get swim mode state (for prone swimming animation like Minecraft)
   getSwimModeState(playerPosition, inputState = {}) {
     const headSubmerged = this.isPlayerHeadSubmerged(playerPosition);
     const fullySubmerged = this.isPlayerInWater(playerPosition) && headSubmerged;
     const isSprinting = inputState.sprint && inputState.forward;
-    
-    // Minecraft: sprint in water while fully submerged = swim mode (horizontal)
     return {
       inSwimMode: fullySubmerged && isSprinting,
       fullySubmerged,
@@ -1246,12 +1169,7 @@ export class WaterPhysics {
     };
   }
   
-  // ============================================
-  // CLEANUP
-  // ============================================
-  
   dispose() {
-    // Remove all water meshes
     for (const waterBlock of this.waterBlocks.values()) {
       if (waterBlock.mesh) {
         waterBlock.mesh.parent?.remove(waterBlock.mesh);

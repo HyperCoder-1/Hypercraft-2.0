@@ -81,7 +81,12 @@ export default class ChunkManager {
     this._lightingRebuildThreshold = 0.05; // Rebuild when time changes by this amount 
     this._maxLightingRebuildsPerFrame = 2; // Limit rebuilds per frame
     this._lastLightingRebuildTime = 0.5; // Track when we last queued a full rebuild
-    if (DEBUG.logChunkLoading) console.log(`ChunkManager: init (seed=${this.seed}, blockSize=${this.blockSize}, viewDistance=${this.viewDistance})`);
+    if (DEBUG.logChunkLoading) {
+      const initMsg = `ChunkManager: init (seed=${this.seed}, blockSize=${this.blockSize}, viewDistance=${this.viewDistance})`;
+      console.log(initMsg);
+    }
+    this._debugOverlay = options.debugOverlay ?? null;
+    if (this._debugOverlay && DEBUG.logChunkLoading) this._debugOverlay.pushMessage(`ChunkManager init — view=${this.viewDistance}`, { duration: 2500 });
     this.materials = this._createMaterials();
     // async load queue to avoid blocking the main thread
     this._loadQueue = [];
@@ -109,7 +114,7 @@ export default class ChunkManager {
         if (msg.biomeMap) chunk.biomeMap = new Uint8Array(msg.biomeMap);
 
         // Finalize chunk on main thread (build mesh, add to scene)
-        this._finalizeChunkFromWorker(chunk, pending.cx, pending.cz);
+        this._finalizeChunkFromWorker(chunk, pending.cx, pending.cz, pending);
       };
     } catch (e) {
       // Worker not supported or failed to construct — fall back to main-thread generation
@@ -368,7 +373,7 @@ export default class ChunkManager {
   }
 
   // Finalize chunk data received/generated off-main-thread: compute top, build meshes, add to scene
-  _finalizeChunkFromWorker(chunk, cx, cz) {
+  _finalizeChunkFromWorker(chunk, cx, cz, meta = null) {
     const bs = this.blockSize;
 
     // If chunk missing, abort
@@ -376,9 +381,6 @@ export default class ChunkManager {
     // If a chunk with this key is already present, skip
     const fKey = this._key(cx, cz);
     if (this.chunks.has(fKey)) return;
-
-    // Check if chunk is still within view distance before adding it
-    // This prevents chunks from being added and immediately removed (flickering)
     if (this._playerChunkX !== null && this._playerChunkZ !== null) {
       const dx = cx - this._playerChunkX;
       const dz = cz - this._playerChunkZ;
@@ -387,7 +389,9 @@ export default class ChunkManager {
       
       if (distanceSquared > maxDistanceSquared) {
         if (DEBUG.logChunkLoading) {
-          console.log(`ChunkManager: Skipping chunk ${cx},${cz} - outside view distance (${Math.sqrt(distanceSquared).toFixed(1)} > ${this.viewDistance})`);
+          const skipMsg = `ChunkManager: Skipping chunk ${cx},${cz} - outside view distance (${Math.sqrt(distanceSquared).toFixed(1)} > ${this.viewDistance})`;
+          console.log(skipMsg);
+          if (this._debugOverlay) this._debugOverlay.pushMessage(skipMsg, { duration: 2200 });
         }
         return;
       }
@@ -421,6 +425,34 @@ export default class ChunkManager {
     group.position.set(chunkWorldX, 0, chunkWorldZ);
 
     this.scene.add(group);
+    // Compute some diagnostics for logging
+    if (DEBUG.logChunkLoading) {
+      const now = performance.now();
+      const queuedAt = meta && meta.queuedAt ? meta.queuedAt : null;
+      const elapsed = queuedAt ? (now - queuedAt).toFixed(1) : null;
+      // Count non-air blocks (simple byte scan)
+      let nonAir = 0;
+      const dataArr = chunk.data;
+      for (let i = 0; i < dataArr.length; i++) if (dataArr[i] !== 0) nonAir++;
+      // Top stats
+      let minTop = Infinity, maxTop = -Infinity, sumTop = 0, topCount = 0;
+      for (let i = 0; i < top.length; i++) {
+        const v = top[i];
+        if (v > (MIN_Y - 1)) {
+          minTop = Math.min(minTop, v);
+          maxTop = Math.max(maxTop, v);
+          sumTop += v;
+          topCount++;
+        }
+      }
+      const avgTop = topCount > 0 ? (sumTop / topCount) : -Infinity;
+      const source = queuedAt ? (meta && meta.priority !== undefined ? 'worker' : 'queued') : 'sync';
+      const expectedBytes = dataArr.byteLength ? dataArr.byteLength : (dataArr.length);
+      const loadMsg = `Loaded chunk ${cx},${cz} (${source}) ${elapsed !== null ? elapsed + 'ms' : 'sync'} nonAir=${nonAir}/${dataArr.length}`;
+      console.log(`ChunkManager: ${loadMsg} topMin=${isFinite(minTop) ? minTop : 'n/a'} topMax=${isFinite(maxTop) ? maxTop : 'n/a'} topAvg=${isFinite(avgTop) ? avgTop.toFixed(1) : 'n/a'} loadedChunks=${this.chunks.size + 1}`);
+      if (this._debugOverlay) this._debugOverlay.pushMessage(loadMsg, { duration: 4000 });
+    }
+
     const key = this._key(cx, cz);
     this.chunks.set(key, { cx, cz, group, top, data: chunk.data, skyLight, blockLight, builtAtTime: this._timeOfDay });
     
@@ -537,6 +569,16 @@ export default class ChunkManager {
           for (let faceIdx = 0; faceIdx < 6; faceIdx++) {
             const dir = FACE_DIRS[faceIdx].dir;
             const nx = x + dir[0], ny = y + dir[1], nz = z + dir[2];
+            if (nx < 0 || nx >= CHUNK_SIZE || nz < 0 || nz >= CHUNK_SIZE) {
+              const globalX = cx * CHUNK_SIZE + nx;
+              const globalZ = cz * CHUNK_SIZE + nz;
+              const neighborCX = Math.floor(globalX / CHUNK_SIZE);
+              const neighborCZ = Math.floor(globalZ / CHUNK_SIZE);
+              const neighborKey = this._key(neighborCX, neighborCZ);
+              if (!this.chunks.has(neighborKey)) {continue;
+              }
+            }
+
             const neighborId = this._getBlock(chunk.data, cx, cz, nx, ny, nz);
 
             // Only render face if neighbor is transparent or block is transparent (for water/ice surfaces)
@@ -887,7 +929,7 @@ export default class ChunkManager {
         return;
       }
     }
-    this._loadQueue.push({ key, cx, cz, priority });
+    this._loadQueue.push({ key, cx, cz, priority, queuedAt: performance.now() });
   }
 
   // process a small number of queued loads per frame to avoid jank
@@ -971,9 +1013,11 @@ export default class ChunkManager {
     if (!rec) return;
     
     // Dispose geometries to free GPU memory (materials are shared, don't dispose)
+    let meshCount = 0;
     rec.group.traverse((child) => {
       if (child.isMesh && child.geometry) {
         child.geometry.dispose();
+        meshCount++;
       }
     });
     
@@ -987,7 +1031,11 @@ export default class ChunkManager {
     if (cx === this._playerChunkX && cz === this._playerChunkZ) {
       this._clearPlayerBorders();
     }
-    if (DEBUG.logChunkLoading) console.log(`_unloadChunk: chunk ${cx},${cz} unloaded and removed`);
+    if (DEBUG.logChunkLoading) {
+      const unloadMsg = `Unloaded chunk ${cx},${cz} meshesRemoved=${meshCount}`;
+      console.log(`ChunkManager: ${unloadMsg} loadedChunks=${this.chunks.size}`);
+      if (this._debugOverlay) this._debugOverlay.pushMessage(unloadMsg, { duration: 3000 });
+    }
   }
 
   // update loaded chunks based on center world position
@@ -1035,7 +1083,9 @@ export default class ChunkManager {
     }
     
     if (DEBUG.logChunkLoading && chunksToUnload.length > 0) {
-      console.log(`ChunkManager: unloaded ${chunksToUnload.length} chunks outside view distance`);
+      const uMsg = `Unloaded ${chunksToUnload.length} chunks outside view distance`;
+      console.log(`ChunkManager: ${uMsg}`);
+      if (this._debugOverlay) this._debugOverlay.pushMessage(uMsg, { duration: 2600 });
     }
 
     // Clean up pending worker requests for chunks outside view distance
@@ -1052,7 +1102,9 @@ export default class ChunkManager {
       }
       
       if (DEBUG.logChunkLoading && pendingToCancel.length > 0) {
-        console.log(`ChunkManager: cancelled ${pendingToCancel.length} pending worker requests outside view distance`);
+        const cMsg = `Cancelled ${pendingToCancel.length} pending worker requests`;
+        console.log(`ChunkManager: ${cMsg} outside view distance`);
+        if (this._debugOverlay) this._debugOverlay.pushMessage(cMsg, { duration: 2600 });
       }
     }
 
@@ -1062,7 +1114,9 @@ export default class ChunkManager {
     const removedFromQueue = originalQueueLength - this._loadQueue.length;
     
     if (DEBUG.logChunkLoading && removedFromQueue > 0) {
-      console.log(`ChunkManager: removed ${removedFromQueue} items from load queue outside view distance`);
+      const rMsg = `Removed ${removedFromQueue} items from load queue`;
+      console.log(`ChunkManager: ${rMsg} outside view distance`);
+      if (this._debugOverlay) this._debugOverlay.pushMessage(rMsg, { duration: 2200 });
     }
   }
 

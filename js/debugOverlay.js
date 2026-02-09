@@ -12,6 +12,57 @@ export default function createDebugOverlay() {
   el.style.whiteSpace = 'pre';
   el.style.display = 'none';
 
+  // Chat-style message stack placed at top-right of the screen
+  const stack = document.createElement('div');
+  stack.style.position = 'fixed';
+  stack.style.bottom = '0px';
+  stack.style.left = '0px';
+  stack.style.display = 'flex';
+  stack.style.flexDirection = 'column';
+  stack.style.alignItems = 'flex-start';
+  stack.style.gap = '4px';
+  stack.style.zIndex = '10000';
+  document.body.appendChild(stack);
+
+  const messages = [];
+  function pushMessage(text, opts = {}) {
+    const duration = opts.duration || 1000;
+    const level = opts.level || 'info';
+    const m = document.createElement('div');
+    m.textContent = text;
+    m.style.background = level === 'error' ? 'rgba(160,40,40,0.9)' : 'rgba(0,0,0,0.7)';
+    m.style.color = '#fff';
+    m.style.padding = '5px 5px';
+    m.style.fontFamily = 'monospace';
+    m.style.fontSize = '11px';
+    m.style.maxWidth = '420px';
+    m.style.boxShadow = '0 4px 14px rgba(0,0,0,0.4)';
+    m.style.opacity = '0';
+    m.style.transform = 'translateY(-6px)';
+    m.style.transition = 'opacity 220ms ease, transform 220ms ease, height 220ms ease, margin 220ms ease';
+    stack.appendChild(m);
+    // force layout then animate in
+    requestAnimationFrame(() => { m.style.opacity = '1'; m.style.transform = 'translateY(0)'; });
+    const entry = { el: m, timeout: null };
+    messages.push(entry);
+    // Auto-hide after duration; ensure messages hide one by one via their own timers
+    entry.timeout = setTimeout(() => { removeMessage(entry); }, duration);
+    return entry;
+  }
+
+  function removeMessage(entry) {
+    if (!entry || !entry.el) return;
+    const m = entry.el;
+    m.style.opacity = '0';
+    m.style.transform = 'translateY(-6px)';
+    // Wait for transition then remove from DOM and array
+    setTimeout(() => {
+      try { stack.removeChild(m); } catch (e) {}
+      const idx = messages.indexOf(entry);
+      if (idx >= 0) messages.splice(idx, 1);
+    }, 200);
+    if (entry.timeout) { clearTimeout(entry.timeout); entry.timeout = null; }
+  }
   document.body.appendChild(el);
 
   let lastUpdate = 0;
@@ -39,6 +90,7 @@ export default function createDebugOverlay() {
 
   return {
     el,
+    pushMessage,
     show(v = true) { el.style.display = v ? 'block' : 'none'; },
     toggle() { el.style.display = el.style.display === 'none' ? 'block' : 'none'; },
     update(info) {
