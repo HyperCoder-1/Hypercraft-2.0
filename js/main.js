@@ -17,13 +17,6 @@ export function main() {
 
   const ambient = new THREE.AmbientLight(0xffffff, 0.6);
   scene.add(ambient);
-  const sunLight = new THREE.DirectionalLight(0xffffff, 1.0);
-  sunLight.position.set(100, 200, 100);
-  scene.add(sunLight);
-
-  const moonLight = new THREE.DirectionalLight(0x88aaff, 0.2);
-  moonLight.position.set(-100, -200, -100);
-  scene.add(moonLight);
 
   const sunMesh = new THREE.Mesh(new THREE.BoxGeometry(1, DAY_NIGHT.sunSize, DAY_NIGHT.sunSize), new THREE.MeshBasicMaterial({ color: DAY_NIGHT.sunColor }));
   const moonMesh = new THREE.Mesh(new THREE.BoxGeometry(1, DAY_NIGHT.moonSize, DAY_NIGHT.moonSize), new THREE.MeshBasicMaterial({ color: DAY_NIGHT.moonColor }));
@@ -64,7 +57,7 @@ export function main() {
     console.error('Error stack:', error.stack);
   }
 
-  
+
 
   const raycaster = new THREE.Raycaster();
   const tempLocalPoint = new THREE.Vector3();
@@ -98,7 +91,8 @@ export function main() {
     for (let bx = minBlockX; bx <= maxBlockX; bx++) {
       for (let bz = minBlockZ; bz <= maxBlockZ; bz++) {
         for (let by = minBlockY; by <= maxBlockY; by++) {
-          const id = cm.getBlockAtWorld(bx * bs + 0.5 * bs, by * bs + 0.5 * bs, bz * bs + 0.5 * bs);
+          // Use conservative mode: treat unloaded chunks as solid to prevent phasing through
+          const id = cm.getBlockAtWorld(bx * bs + 0.5 * bs, by * bs + 0.5 * bs, bz * bs + 0.5 * bs, true);
           if (!isBlockPassable(id)) return false;
         }
       }
@@ -136,7 +130,8 @@ export function main() {
   }
 
   const spawnWorldX = PLAYER.spawnX, spawnWorldZ = PLAYER.spawnZ;
-  let spawnY = cm.getTopAtWorld(spawnWorldX, spawnWorldZ);
+  // Use synchronous loading for spawn to ensure chunk is loaded before player spawns
+  let spawnY = cm.getTopAtWorld(spawnWorldX, spawnWorldZ, true);
   if (!isFinite(spawnY)) spawnY = (MIN_Y + 1) * blockSize;
   const spawnX = spawnWorldX;
   const spawnZ = spawnWorldZ;
@@ -202,7 +197,8 @@ export function main() {
       const sx = headWorld.x + dir.x * d;
       const sy = headWorld.y + dir.y * d;
       const sz = headWorld.z + dir.z * d;
-      const id = cm.getBlockAtWorld(sx, sy, sz);
+      // Use conservative mode to prevent camera clipping through unloaded chunks
+      const id = cm.getBlockAtWorld(sx, sy, sz, true);
       if (!isBlockPassable(id)) { blocked = true; break; }
       lastFree.set(sx, sy, sz);
     }
@@ -239,9 +235,10 @@ export function main() {
     const checkX = eyeWorldX + lookDir.x * nearClipDist;
     const checkY = eyeWorldY + lookDir.y * nearClipDist;
     const checkZ = eyeWorldZ + lookDir.z * nearClipDist;
-    const eyeBlockId = cm.getBlockAtWorld(eyeWorldX, eyeWorldY, eyeWorldZ);
-    const lookBlockId = cm.getBlockAtWorld(checkX, checkY, checkZ);
-    const aboveBlockId = cm.getBlockAtWorld(eyeWorldX, eyeWorldY + 0.25, eyeWorldZ);
+    // Use conservative mode for camera collision to prevent clipping through unloaded chunks
+    const eyeBlockId = cm.getBlockAtWorld(eyeWorldX, eyeWorldY, eyeWorldZ, true);
+    const lookBlockId = cm.getBlockAtWorld(checkX, checkY, checkZ, true);
+    const aboveBlockId = cm.getBlockAtWorld(eyeWorldX, eyeWorldY + 0.25, eyeWorldZ, true);
     const eyeBlocked = !isBlockPassable(eyeBlockId);
     const lookBlocked = !isBlockPassable(lookBlockId);
     const aboveBlocked = !isBlockPassable(aboveBlockId);
@@ -271,7 +268,8 @@ export function main() {
         const testX = eyeWorldX + lookDir.x * d;
         const testY = eyeWorldY + lookDir.y * d;
         const testZ = eyeWorldZ + lookDir.z * d;
-        const testBlockId = cm.getBlockAtWorld(testX, testY, testZ);
+        // Use conservative mode for camera collision
+        const testBlockId = cm.getBlockAtWorld(testX, testY, testZ, true);
         if (isBlockPassable(testBlockId)) {
           safeOffset = nearClipDist - d;
           break;
@@ -466,7 +464,8 @@ export function main() {
           placeY += closestFace.dy;
           placeZ += closestFace.dz;
           
-          const checkBlockId = cm.getBlockAtWorld(placeX + 0.5, placeY + 0.5, placeZ + 0.5);
+          // Use conservative mode: prevent placing blocks in unloaded chunks
+          const checkBlockId = cm.getBlockAtWorld(placeX + 0.5, placeY + 0.5, placeZ + 0.5, true);
           
           if (checkBlockId !== 0) {
             console.log('Cannot place water - position occupied by block', checkBlockId);
@@ -715,7 +714,8 @@ export function main() {
         for (const [ox, oz] of ceilingSamples) {
           const sx = player.position.x + ox;
           const sz = player.position.z + oz;
-          const headBlockId = cm.getBlockAtWorld(sx, checkY, sz);
+          // Use conservative mode to prevent phasing through unloaded ceilings
+          const headBlockId = cm.getBlockAtWorld(sx, checkY, sz, true);
           if (!isBlockPassable(headBlockId)) {
             const blockBottomWorldY = blockY * bs;
             if (blockBottomWorldY < lowestCeilingY && blockBottomWorldY > currentTopY - 0.01) {
@@ -749,11 +749,15 @@ export function main() {
     ];
 
     let maxGroundY = -Infinity;
+    let hasValidGroundData = false; // Track if any chunks are loaded beneath player
     for (const [ox, oz] of samples) {
       const sx = player.position.x + ox;
       const sz = player.position.z + oz;
       const gy = cm.getGroundAtWorld(sx, playerBottomY, sz);
-      if (isFinite(gy) && gy > maxGroundY) maxGroundY = gy;
+      if (isFinite(gy)) {
+        hasValidGroundData = true;
+        if (gy > maxGroundY) maxGroundY = gy;
+      }
     }
 
     if (isFinite(maxGroundY)) {
@@ -766,7 +770,17 @@ export function main() {
         onGround = (playerBottomY - maxGroundY) < groundThreshold;
       }
     } else {
-      onGround = false;
+      // No valid ground data - chunks not loaded yet
+      if (!hasValidGroundData) {
+        // Safety: chunks aren't loaded beneath player, reduce gravity to prevent falling through
+        if (velY < 0) {
+          velY *= 0.5; // Slow down falling while chunks load
+        }
+        // Keep onGround state to prevent freefall
+        // onGround remains as it was (don't set to false)
+      } else {
+        onGround = false;
+      }
     }
   }
 
@@ -811,13 +825,11 @@ export function main() {
     const sunDist = DAY_NIGHT.orbitDistance;
     celestialPos.set(Math.cos(angle) * sunDist + player.position.x, Math.sin(angle) * sunDist, Math.sin(angle * 0.5) * -200 + player.position.z);
     sunMesh.position.copy(celestialPos);
-    sunLight.position.copy(celestialPos);
     sunMesh.rotation.set(0, 0, angle);
 
     const moonAngle = angle + Math.PI;
     celestialPos.set(Math.cos(moonAngle) * sunDist + player.position.x, Math.sin(moonAngle) * sunDist, Math.sin(moonAngle * 0.5) * -200 + player.position.z);
     moonMesh.position.copy(celestialPos);
-    moonLight.position.copy(celestialPos);
     moonMesh.rotation.set(0, 0, moonAngle);
 
     let sunIntensity = 0;
@@ -854,8 +866,6 @@ export function main() {
 
     const timeOfDay = (t / CYCLE_LENGTH);
     cm.setTimeOfDay(timeOfDay);
-    sunLight.intensity = sunIntensity * 0.8;
-    moonLight.intensity = moonIntensity * 0.15;
     ambient.intensity = 0.3 + ambientRatio * 0.3;
 
     if (typeof clouds !== 'undefined' && clouds && clouds.group) {
@@ -930,7 +940,8 @@ export function main() {
       else facingName = 'East (Towards +X)';
 
       const headY = player.position.y + currentPlayerHeight * CAMERA.eyeHeight;
-      const headBlockId = cm.getBlockAtWorld(player.position.x, headY, player.position.z);
+      // Use conservative mode for head block check to detect swimming/suffocation
+      const headBlockId = cm.getBlockAtWorld(player.position.x, headY, player.position.z, true);
 
       const lightInfo = cm.getLightAtWorld(player.position.x, player.position.y, player.position.z);
 

@@ -12,7 +12,6 @@ export default function createDebugOverlay() {
   el.style.whiteSpace = 'pre';
   el.style.display = 'none';
 
-  // Chat-style message stack placed at top-right of the screen
   const stack = document.createElement('div');
   stack.style.position = 'fixed';
   stack.style.bottom = '0px';
@@ -21,6 +20,7 @@ export default function createDebugOverlay() {
   stack.style.flexDirection = 'column';
   stack.style.alignItems = 'flex-start';
   stack.style.gap = '4px';
+  stack.style.height = '100px';
   stack.style.zIndex = '10000';
   document.body.appendChild(stack);
 

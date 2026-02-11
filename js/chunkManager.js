@@ -92,6 +92,12 @@ export default class ChunkManager {
     this._loadQueue = [];
     this._isProcessingQueue = false;
     this.maxLoadsPerFrame = options.maxLoadsPerFrame ?? RENDER.maxLoadsPerFrame;
+    // Finalization queue to spread expensive main-thread work across frames
+    this._finalizationQueue = [];
+    this._maxFinalizationsPerFrame = 2; // Limit finalizations to avoid lag spikes
+    // Unload queue to spread chunk disposal across frames
+    this._unloadQueue = [];
+    this._maxUnloadsPerFrame = 3; // Limit unloads per frame to avoid lag spikes
     // Worker for chunk generation to avoid main-thread spikes
     try {
       this._chunkWorker = new Worker('js/chunkWorker.js', { type: 'module' });
@@ -107,14 +113,29 @@ export default class ChunkManager {
         this._pendingRequests.delete(key);
         if (!pending) return; // no longer needed
 
+        // Check if chunk is still within view distance BEFORE doing expensive finalization
+        if (this._playerChunkX !== null && this._playerChunkZ !== null) {
+          const dx = msg.cx - this._playerChunkX;
+          const dz = msg.cz - this._playerChunkZ;
+          const distanceSquared = dx * dx + dz * dz;
+          const maxDistanceSquared = this.viewDistance * this.viewDistance;
+          
+          if (distanceSquared > maxDistanceSquared) {
+            if (DEBUG.logChunkLoading) {
+              console.log(`ChunkManager: Discarding worker result for ${msg.cx},${msg.cz} - outside view distance`);
+            }
+            return; // Skip finalization entirely - save all the work!
+          }
+        }
+
         // Reconstruct typed arrays from transferred buffers
         const chunk = { data: null, heightMap: null, biomeMap: null };
         if (msg.data) chunk.data = new Uint8Array(msg.data);
         if (msg.heightMap) chunk.heightMap = new Int16Array(msg.heightMap);
         if (msg.biomeMap) chunk.biomeMap = new Uint8Array(msg.biomeMap);
 
-        // Finalize chunk on main thread (build mesh, add to scene)
-        this._finalizeChunkFromWorker(chunk, pending.cx, pending.cz, pending);
+        // Queue for finalization instead of immediate processing to avoid lag spikes
+        this._finalizationQueue.push({ chunk, cx: pending.cx, cz: pending.cz, meta: pending });
       };
     } catch (e) {
       // Worker not supported or failed to construct — fall back to main-thread generation
@@ -486,19 +507,14 @@ export default class ChunkManager {
   }
 
   _addTrees(chunk, cx, cz) {
-    // Deterministic RNG per chunk
-    const javalcg = (a) => {
-      return function() {
-        let s = BigInt(seed) & ((1n << 48n) - 1n);
-        return function() {
-          s = (s * 25214903917n + 11n) & ((1n << 48n) - 1n);
-          const a = Number(s >> 22n);
-          return a / (1 << 26);
-        };
-      };
+    // Deterministic RNG per chunk (Java LCG algorithm)
+    const seedMix = BigInt((this.seed ^ ((cx * 73856093) >>> 0) ^ ((cz * 19349663) >>> 0)) >>> 0);
+    let s = seedMix & ((1n << 48n) - 1n);
+    const rng = () => {
+      s = (s * 25214903917n + 11n) & ((1n << 48n) - 1n);
+      const value = Number(s >> 22n);
+      return value / (1 << 26);
     };
-    const seedMix = (this.seed ^ ((cx * 73856093) >>> 0) ^ ((cz * 19349663) >>> 0)) >>> 0;
-    const rng = javalcg(seedMix);
 
     // Find grass tops and place trees
     for (let x = 0; x < CHUNK_SIZE; x++) {
@@ -942,6 +958,9 @@ export default class ChunkManager {
     // Sort by priority (lower = closer = higher priority)
     this._loadQueue.sort((a, b) => a.priority - b.priority);
     
+    // Mark as processing to prevent race conditions
+    this._isProcessingQueue = true;
+    
     // Use requestIdleCallback to only generate chunks when browser is idle
     // This ensures FPS is never impacted by chunk generation
     const processWhenIdle = (deadline) => {
@@ -949,13 +968,12 @@ export default class ChunkManager {
       // or if the callback was triggered due to timeout
       if (deadline.timeRemaining() < 10 && !deadline.didTimeout) {
         // Not enough idle time, reschedule
+        this._isProcessingQueue = false;
         if (this._loadQueue.length > 0) {
-          this._scheduleIdleProcess();
+          this.processLoadQueue();
         }
         return;
       }
-      
-      this._isProcessingQueue = true;
       
       // Process one chunk if we have idle time
       const item = this._loadQueue.shift();
@@ -984,27 +1002,86 @@ export default class ChunkManager {
         }
       }
       
+      // Reset processing flag before scheduling next
       this._isProcessingQueue = false;
       
       // Schedule next chunk if queue not empty
       if (this._loadQueue.length > 0) {
-        this._scheduleIdleProcess();
+        this.processLoadQueue();
       }
     };
     
-    this._scheduleIdleProcess = () => {
-      if (typeof requestIdleCallback !== 'undefined') {
-        // Use idle callback with 500ms timeout to ensure chunks eventually load
-        requestIdleCallback(processWhenIdle, { timeout: 500 });
-      } else {
-        // Fallback for browsers without requestIdleCallback
-        setTimeout(() => {
-          processWhenIdle({ timeRemaining: () => 50, didTimeout: true });
-        }, 50);
-      }
-    };
+    if (typeof requestIdleCallback !== 'undefined') {
+      // Use idle callback with 500ms timeout to ensure chunks eventually load
+      requestIdleCallback(processWhenIdle, { timeout: 500 });
+    } else {
+      // Fallback for browsers without requestIdleCallback
+      setTimeout(() => {
+        processWhenIdle({ timeRemaining: () => 50, didTimeout: true });
+      }, 50);
+    }
+  }
+
+  // Process finalization queue - limit per frame to avoid lag spikes
+  _processFinalizationQueue() {
+    // Increase finalization rate when queue is growing (player moving fast into new terrain)
+    const baseRate = this._maxFinalizationsPerFrame;
+    const urgentRate = Math.min(4, Math.max(baseRate, Math.ceil(this._finalizationQueue.length / 10)));
+    const maxToProcess = this._finalizationQueue.length > 5 ? urgentRate : baseRate;
     
-    this._scheduleIdleProcess();
+    let processedCount = 0;
+    
+    // Sort by priority (distance from player) - closer chunks first
+    if (this._playerChunkX !== null && this._playerChunkZ !== null) {
+      this._finalizationQueue.sort((a, b) => {
+        const aDist = (a.cx - this._playerChunkX) ** 2 + (a.cz - this._playerChunkZ) ** 2;
+        const bDist = (b.cx - this._playerChunkX) ** 2 + (b.cz - this._playerChunkZ) ** 2;
+        return aDist - bDist;
+      });
+    }
+    
+    while (this._finalizationQueue.length > 0 && processedCount < maxToProcess) {
+      const item = this._finalizationQueue.shift();
+      
+      // Double-check chunk is still needed (player might have moved)
+      if (this._playerChunkX !== null && this._playerChunkZ !== null) {
+        const dx = item.cx - this._playerChunkX;
+        const dz = item.cz - this._playerChunkZ;
+        const distanceSquared = dx * dx + dz * dz;
+        const maxDistanceSquared = this.viewDistance * this.viewDistance;
+        
+        if (distanceSquared > maxDistanceSquared) {
+          if (DEBUG.logChunkLoading) {
+            console.log(`ChunkManager: Skipping finalization for ${item.cx},${item.cz} - moved out of range`);
+          }
+          continue; // Skip this chunk, don't count toward limit
+        }
+      }
+      
+      // Finalize the chunk (compute lighting, build mesh, add to scene)
+      this._finalizeChunkFromWorker(item.chunk, item.cx, item.cz, item.meta);
+      processedCount++;
+    }
+  }
+
+  // Process unload queue - limit per frame to avoid lag spikes
+  _processUnloadQueue() {
+    // Increase unload rate when queue is large (player moving fast)
+    const baseRate = this._maxUnloadsPerFrame;
+    const urgentRate = this._unloadQueue.length > 10 ? Math.min(6, baseRate * 2) : baseRate;
+    const maxToProcess = urgentRate;
+    
+    let unloadedCount = 0;
+    
+    while (this._unloadQueue.length > 0 && unloadedCount < maxToProcess) {
+      const item = this._unloadQueue.shift();
+      
+      // Only unload if chunk still exists (might have been handled already)
+      if (this.chunks.has(item.key)) {
+        this._unloadChunk(item.cx, item.cz);
+        unloadedCount++;
+      }
+    }
   }
 
   _unloadChunk(cx, cz) {
@@ -1024,8 +1101,9 @@ export default class ChunkManager {
     this.scene.remove(rec.group);
     this.chunks.delete(key);
     
-    // Rebuild neighboring chunks to show faces that were hidden by this chunk
-    this._rebuildNeighborChunks(cx, cz);
+    // REMOVED: Rebuilding neighboring chunks on unload causes lag
+    // Neighbors will be rebuilt naturally when new chunks load nearby
+    // this._rebuildNeighborChunks(cx, cz);
     
     // Clear player borders if this was the player's chunk
     if (cx === this._playerChunkX && cz === this._playerChunkZ) {
@@ -1041,6 +1119,12 @@ export default class ChunkManager {
   // update loaded chunks based on center world position
   update(centerWorldX, centerWorldZ) {
     const bs = this.blockSize;
+
+    // Process pending chunk finalizations first (spread work across frames)
+    this._processFinalizationQueue();
+    
+    // Process pending chunk unloads (spread work across frames)
+    this._processUnloadQueue();
 
     // compute center chunk coords
     const centerChunkX = Math.floor(centerWorldX / (CHUNK_SIZE * bs));
@@ -1077,13 +1161,17 @@ export default class ChunkManager {
       }
     }
     
-    // Unload chunks that are too far away
+    // Queue chunks for unloading instead of unloading all at once
     for (const { cx, cz } of chunksToUnload) {
-      this._unloadChunk(cx, cz);
+      const key = this._key(cx, cz);
+      // Avoid duplicate queue entries
+      if (!this._unloadQueue.some(item => item.key === key)) {
+        this._unloadQueue.push({ key, cx, cz });
+      }
     }
     
     if (DEBUG.logChunkLoading && chunksToUnload.length > 0) {
-      const uMsg = `Unloaded ${chunksToUnload.length} chunks outside view distance`;
+      const uMsg = `Queued ${chunksToUnload.length} chunks for unloading`;
       console.log(`ChunkManager: ${uMsg}`);
       if (this._debugOverlay) this._debugOverlay.pushMessage(uMsg, { duration: 2600 });
     }
@@ -1118,10 +1206,25 @@ export default class ChunkManager {
       console.log(`ChunkManager: ${rMsg} outside view distance`);
       if (this._debugOverlay) this._debugOverlay.pushMessage(rMsg, { duration: 2200 });
     }
+
+    // Clean up finalization queue for chunks outside view distance
+    const originalFinalizationLength = this._finalizationQueue.length;
+    this._finalizationQueue = this._finalizationQueue.filter(item => {
+      const key = this._key(item.cx, item.cz);
+      return wanted.has(key);
+    });
+    const removedFromFinalization = originalFinalizationLength - this._finalizationQueue.length;
+    
+    if (DEBUG.logChunkLoading && removedFromFinalization > 0) {
+      const fMsg = `Removed ${removedFromFinalization} items from finalization queue`;
+      console.log(`ChunkManager: ${fMsg} outside view distance`);
+      if (this._debugOverlay) this._debugOverlay.pushMessage(fMsg, { duration: 2200 });
+    }
   }
 
   // Query top surface Y in world coordinates. Returns world Y of top surface (one unit above top block), or -Infinity.
-  getTopAtWorld(worldX, worldZ) {
+  // Set allowSyncLoad=true for critical operations like spawn that need immediate results
+  getTopAtWorld(worldX, worldZ, allowSyncLoad = false) {
     const bs = this.blockSize;
     // compute global column indices relative to chunk grid used in _loadChunk
     // We don't use totalHalf now; instead compute chunk and local col directly
@@ -1133,10 +1236,19 @@ export default class ChunkManager {
     const localZ = ((globalColZ % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
     let rec = this.chunks.get(this._key(cx, cz));
     if (!rec) {
-      // chunk not loaded yet — generate and load it synchronously so callers don't fall through
-      this._loadChunk(cx, cz);
-      rec = this.chunks.get(this._key(cx, cz));
-      if (!rec) return -Infinity;
+      if (allowSyncLoad) {
+        // Critical operation (spawn, etc.) - load synchronously
+        this._loadChunk(cx, cz);
+        rec = this.chunks.get(this._key(cx, cz));
+        if (!rec) return -Infinity;
+      } else {
+        // Queue chunk for async loading instead of blocking main thread
+        const dx = cx - this._playerChunkX;
+        const dz = cz - this._playerChunkZ;
+        const priority = dx * dx + dz * dz;
+        this.queueLoad(cx, cz, priority);
+        return -Infinity; // Return sentinel until chunk loads
+      }
     }
     const topBlockY = rec.top[localX * CHUNK_SIZE + localZ];
     if (topBlockY < MIN_Y) return -Infinity;
@@ -1145,7 +1257,8 @@ export default class ChunkManager {
 
   // Find the top of the highest solid block at or below the given world Y coordinate.
   // Returns the world Y of the top surface of that block, or -Infinity if none found.
-  getGroundAtWorld(worldX, worldY, worldZ) {
+  // Set allowSyncLoad=true for critical operations like spawn that need immediate results
+  getGroundAtWorld(worldX, worldY, worldZ, allowSyncLoad = false) {
     const bs = this.blockSize;
     const gx = Math.floor(worldX / bs);
     const gz = Math.floor(worldZ / bs);
@@ -1160,9 +1273,19 @@ export default class ChunkManager {
     const recKey = this._key(cx, cz);
     let rec = this.chunks.get(recKey);
     if (!rec) {
-      this._loadChunk(cx, cz);
-      rec = this.chunks.get(recKey);
-      if (!rec) return -Infinity;
+      if (allowSyncLoad) {
+        // Critical operation (spawn, etc.) - load synchronously
+        this._loadChunk(cx, cz);
+        rec = this.chunks.get(recKey);
+        if (!rec) return -Infinity;
+      } else {
+        // Queue chunk for async loading instead of blocking main thread
+        const dx = cx - this._playerChunkX;
+        const dz = cz - this._playerChunkZ;
+        const priority = dx * dx + dz * dz;
+        this.queueLoad(cx, cz, priority);
+        return -Infinity; // Return sentinel until chunk loads
+      }
     }
     // Scan downward from startBlockY to find the first solid (non-passable) block
     for (let by = startBlockYClamped; by >= MIN_Y; by--) {
@@ -1177,7 +1300,8 @@ export default class ChunkManager {
   }
 
   // Return block id at world coords (x,y,z). Loads chunk if needed. 0 = air.
-  getBlockAtWorld(worldX, worldY, worldZ) {
+  // Set conservativeUnloaded=true to treat unloaded chunks as solid (prevents phasing through unloaded terrain)
+  getBlockAtWorld(worldX, worldY, worldZ, conservativeUnloaded = false) {
     const bs = this.blockSize;
     const gx = Math.floor(worldX / bs);
     const gz = Math.floor(worldZ / bs);
@@ -1189,9 +1313,13 @@ export default class ChunkManager {
     const recKey = this._key(cx, cz);
     let rec = this.chunks.get(recKey);
     if (!rec) {
-      this._loadChunk(cx, cz);
-      rec = this.chunks.get(recKey);
-      if (!rec) return 0;
+      // Queue chunk for async loading instead of blocking main thread
+      const dx = cx - this._playerChunkX;
+      const dz = cz - this._playerChunkZ;
+      const priority = dx * dx + dz * dz;
+      this.queueLoad(cx, cz, priority);
+      // If conservative mode, treat unloaded chunks as solid to prevent phasing through
+      return conservativeUnloaded ? 1 : 0; // Return stone (1) or air (0)
     }
     const y = gyBlock;
     if (y < MIN_Y || y > (MIN_Y + HEIGHT - 1)) return 0;
@@ -1212,10 +1340,15 @@ export default class ChunkManager {
     const recKey = this._key(cx, cz);
     let rec = this.chunks.get(recKey);
     if (!rec) {
-      // load synchronously so change is immediate
-      this._loadChunk(cx, cz);
-      rec = this.chunks.get(recKey);
-      if (!rec) return false;
+      // Queue chunk for async loading - can't modify unloaded chunk
+      const dx = cx - this._playerChunkX;
+      const dz = cz - this._playerChunkZ;
+      const priority = dx * dx + dz * dz;
+      this.queueLoad(cx, cz, priority);
+      if (DEBUG.logChunkLoading) {
+        console.warn(`Cannot set block at (${worldX}, ${worldY}, ${worldZ}) - chunk not loaded`);
+      }
+      return false; // Cannot modify unloaded chunk
     }
 
     const y = gyBlock;
@@ -1500,5 +1633,57 @@ export default class ChunkManager {
     const combined = Math.max(Math.floor(sky * dayBrightness), block);
     
     return { skyLight: sky, blockLight: block, combined };
+  }
+
+  // Dispose of ChunkManager resources (call when no longer needed)
+  dispose() {
+    // Terminate worker thread to prevent memory leak
+    if (this._chunkWorker) {
+      this._chunkWorker.terminate();
+      this._chunkWorker = null;
+    }
+    
+    // Clear pending requests
+    this._pendingRequests.clear();
+    
+    // Clear load queue
+    this._loadQueue = [];
+    
+    // Clear finalization queue
+    this._finalizationQueue = [];
+    
+    // Clear unload queue
+    this._unloadQueue = [];
+    
+    // Unload all chunks and dispose geometries
+    for (const [key, rec] of this.chunks) {
+      if (rec.group) {
+        rec.group.traverse((child) => {
+          if (child.isMesh && child.geometry) {
+            child.geometry.dispose();
+          }
+        });
+        this.scene.remove(rec.group);
+      }
+    }
+    this.chunks.clear();
+    
+    // Clear borders
+    this._clearPlayerBorders();
+    
+    // Dispose shared materials
+    for (const [key, mat] of Object.entries(this.materials)) {
+      if (Array.isArray(mat)) {
+        for (const m of mat) {
+          if (m && m.dispose) m.dispose();
+        }
+      } else if (mat && mat.dispose) {
+        mat.dispose();
+      }
+    }
+    
+    if (DEBUG.logChunkLoading) {
+      console.log('ChunkManager: Disposed all resources');
+    }
   }
 }
