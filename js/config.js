@@ -6,8 +6,16 @@
 // ============================================
 
 // Seed for procedural generation (change for different worlds)
-export const SEED = 14897592187543434;
-
+function seedToNumber(str) {
+  if (!isNaN(str)) return Number(str);
+  
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+export const SEED = seedToNumber('14897592187543434');
 // Terrain generation parameters
 export const TERRAIN = {
   scale: 0.01,           // horizontal noise scale (smaller = smoother terrain)
@@ -137,8 +145,10 @@ export const DAY_NIGHT = {
   
   // Sun/Moon
   sunColor: 0xffee88,
+  // Color for the backdrop plane placed behind the sun (editable at runtime)
+  sunBackdropColor: 0x000000,
   moonColor: 0xccccff,
-  sunSize: 100,
+  sunSize: 500,
   moonSize: 80,
   orbitDistance: 600,
 };

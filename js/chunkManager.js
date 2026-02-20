@@ -121,9 +121,6 @@ export default class ChunkManager {
           const maxDistanceSquared = this.viewDistance * this.viewDistance;
           
           if (distanceSquared > maxDistanceSquared) {
-            if (DEBUG.logChunkLoading) {
-              console.log(`ChunkManager: Discarding worker result for ${msg.cx},${msg.cz} - outside view distance`);
-            }
             return; // Skip finalization entirely - save all the work!
           }
         }
@@ -175,10 +172,10 @@ export default class ChunkManager {
     // Helper to load and configure texture
     const loadTex = (path) => {
       const tex = loader.load(path);
+      tex.generateMipmaps = true;
       tex.colorSpace = THREE.SRGBColorSpace;
+      tex.minFilter = THREE.NearestMipmapLinearFilter;
       tex.magFilter = THREE.NearestFilter;
-      tex.minFilter = THREE.NearestFilter;
-      tex.generateMipmaps = false;
       return tex;
     };
 
@@ -209,7 +206,8 @@ export default class ChunkManager {
       roseBush: 'assets/textures/block/rose_bush_top.png',
       sunflower: 'assets/textures/block/sunflower.png',
       oakLeaves: 'assets/textures/block/oak_leaves.png',
-      waterStill: 'assets/textures/block/water_overlay.png'
+      waterStill: 'assets/textures/block/water_overlay.png',
+      sun: 'assets/textures/environment/sun.png'
     };
 
     const T = {};
@@ -220,6 +218,7 @@ export default class ChunkManager {
     const withMap = (key, opts = {}) => mat({ map: T[key], ...opts });
 
     // Create materials concisely (all with vertexColors enabled for lighting)
+    const sunMat = mat({ map: T.sun, transparent: true, alphaTest: 0.1});
     const stoneMat = withMap('stone');
     const dirtMat = withMap('dirt');
     const waterMat = mat({ map: T.waterStill, transparent: true, opacity: 0.6, side: THREE.DoubleSide });
@@ -250,7 +249,7 @@ export default class ChunkManager {
     const grassSnowSideMat = withMap('grassSnowSide');
     const grassSnowTopMat = withMap('snow');
 
-    const leavesMat = mat({ map: T.oakLeaves, transparent: false, alphaTest: 0.5, color: COLORS.leaves });
+    const leavesMat = mat({ map: T.oakLeaves, transparent: false, alphaTest: 0.5, color: COLORS.leaves});
 
     const deadBushMat = mat({ map: T.deadBush, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide });
     const tallGrassMat = mat({ map: T.tallGrass, color: COLORS.tallGrass, transparent: false, alphaTest: 0.5, side: THREE.DoubleSide });
@@ -258,6 +257,7 @@ export default class ChunkManager {
     const sunflowerMat = mat({ map: T.sunflower, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide });
 
     return {
+      sun: sunMat,
       stone: stoneMat,
       dirt: dirtMat,
       sand: sandMat,
@@ -468,7 +468,6 @@ export default class ChunkManager {
       }
       const avgTop = topCount > 0 ? (sumTop / topCount) : -Infinity;
       const source = queuedAt ? (meta && meta.priority !== undefined ? 'worker' : 'queued') : 'sync';
-      const expectedBytes = dataArr.byteLength ? dataArr.byteLength : (dataArr.length);
       const loadMsg = `Loaded chunk ${cx},${cz} (${source}) ${elapsed !== null ? elapsed + 'ms' : 'sync'} nonAir=${nonAir}/${dataArr.length}`;
       console.log(`ChunkManager: ${loadMsg} topMin=${isFinite(minTop) ? minTop : 'n/a'} topMax=${isFinite(maxTop) ? maxTop : 'n/a'} topAvg=${isFinite(avgTop) ? avgTop.toFixed(1) : 'n/a'} loadedChunks=${this.chunks.size + 1}`);
       if (this._debugOverlay) this._debugOverlay.pushMessage(loadMsg, { duration: 4000 });
@@ -681,11 +680,11 @@ export default class ChunkManager {
 
             // Compute deterministic UV rotation for top faces (+Y)
             let uvRot = 0;
-            if (faceIdx === 2) {
-              // global block coordinates (in blocks, not world units)
-              const globalBlockX = cx * CHUNK_SIZE + x;
-              const globalBlockY = y;
-              const globalBlockZ = cz * CHUNK_SIZE + z;
+            // global block coordinates (in blocks, not world units)
+            const globalBlockX = cx * CHUNK_SIZE + x;
+            const globalBlockY = y;
+            const globalBlockZ = cz * CHUNK_SIZE + z;
+            if (faceIdx === 2 || blockId === BLOCK_LEAVES) {
               uvRot = this._rotFromSeed(globalBlockX, globalBlockY, globalBlockZ);
             }
 
@@ -1051,9 +1050,6 @@ export default class ChunkManager {
         const maxDistanceSquared = this.viewDistance * this.viewDistance;
         
         if (distanceSquared > maxDistanceSquared) {
-          if (DEBUG.logChunkLoading) {
-            console.log(`ChunkManager: Skipping finalization for ${item.cx},${item.cz} - moved out of range`);
-          }
           continue; // Skip this chunk, don't count toward limit
         }
       }

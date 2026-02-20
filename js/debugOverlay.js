@@ -39,7 +39,6 @@ export default function createDebugOverlay() {
     m.style.boxShadow = '0 4px 14px rgba(0,0,0,0.4)';
     m.style.opacity = '0';
     m.style.transform = 'translateY(-6px)';
-    m.style.transition = 'opacity 220ms ease, transform 220ms ease, height 220ms ease, margin 220ms ease';
     stack.appendChild(m);
     // force layout then animate in
     requestAnimationFrame(() => { m.style.opacity = '1'; m.style.transform = 'translateY(0)'; });

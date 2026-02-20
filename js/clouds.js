@@ -1,10 +1,5 @@
 import * as THREE from './three.module.js';
 
-/**
- * Creates Minecraft-style 3D clouds from a texture.
- * Each opaque pixel in the texture becomes a 3D block.
- * Blocks have different face brightness: top (bright), sides (medium), bottom (dark).
- */
 export function createClouds(scene, opts = {}) {
   const {
     texturePath = 'assets/textures/environment/clouds.png',
@@ -47,38 +42,18 @@ export function createClouds(scene, opts = {}) {
   });
 
   const materials = [topMat, sideMat, bottomMat];
-
-  // === GEOMETRIES ===
-  // All geometries are centered at origin; instance matrix handles positioning
-
-  // Top face: horizontal plane facing UP (+Y)
   const topGeom = new THREE.PlaneGeometry(pixelScale, pixelScale);
   topGeom.rotateX(-Math.PI / 2);
-
-  // Bottom face: horizontal plane facing DOWN (-Y)
   const bottomGeom = new THREE.PlaneGeometry(pixelScale, pixelScale);
   bottomGeom.rotateX(Math.PI / 2);
-
-  // Side faces: vertical planes
-  // PlaneGeometry default normal is +Z
-
-  // Front face: at +Z edge, facing +Z (outward)
   const sidePosZ = new THREE.PlaneGeometry(pixelScale, thickness);
-  // No rotation needed - already faces +Z
-
-  // Back face: at -Z edge, facing -Z (outward)
   const sideNegZ = new THREE.PlaneGeometry(pixelScale, thickness);
   sideNegZ.rotateY(Math.PI);
-
-  // Right face: at +X edge, facing +X (outward)
   const sidePosX = new THREE.PlaneGeometry(pixelScale, thickness);
   sidePosX.rotateY(-Math.PI / 2);
-
-  // Left face: at -X edge, facing -X (outward)
   const sideNegX = new THREE.PlaneGeometry(pixelScale, thickness);
   sideNegX.rotateY(Math.PI / 2);
 
-  // === LOAD TEXTURE AND BUILD GEOMETRY ===
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.onload = () => {
@@ -125,7 +100,6 @@ export function createClouds(scene, opts = {}) {
     const posXCount = blocks.filter(b => b.needsPosX).length;
     const negXCount = blocks.filter(b => b.needsNegX).length;
 
-    // Create instanced meshes
     const topMesh = new THREE.InstancedMesh(topGeom, topMat, topCount);
     const bottomMesh = new THREE.InstancedMesh(bottomGeom, bottomMat, bottomCount);
 
@@ -136,7 +110,6 @@ export function createClouds(scene, opts = {}) {
     const posXMesh = posXCount > 0 ? new THREE.InstancedMesh(sidePosX, posXMat, posXCount) : null;
     const negXMesh = negXCount > 0 ? new THREE.InstancedMesh(sideNegX, negXMat, negXCount) : null;
 
-    // Disable frustum culling for clouds (they're always big)
     [topMesh, bottomMesh, posZMesh, negZMesh, posXMesh, negXMesh].forEach(m => {
       if (m) m.frustumCulled = false;
     });
@@ -189,7 +162,6 @@ export function createClouds(scene, opts = {}) {
     if (posXMesh) posXMesh.instanceMatrix.needsUpdate = true;
     if (negXMesh) negXMesh.instanceMatrix.needsUpdate = true;
 
-    // Create a single cloud tile group
     const cloudTile = new THREE.Group();
     cloudTile.add(topMesh);
     cloudTile.add(bottomMesh);
@@ -238,7 +210,6 @@ export function createClouds(scene, opts = {}) {
     texture: { offset: { x: 0, y: 0 } }, // Dummy for compatibility
     material: topMat,
     materials: materials,
-    // Store dimensions for looping
     width: 0,
     height: 0,
     pixelScale: pixelScale

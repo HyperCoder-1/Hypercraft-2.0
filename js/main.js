@@ -18,9 +18,7 @@ export function main() {
   const ambient = new THREE.AmbientLight(0xffffff, 0.6);
   scene.add(ambient);
 
-  const sunMesh = new THREE.Mesh(new THREE.BoxGeometry(1, DAY_NIGHT.sunSize, DAY_NIGHT.sunSize), new THREE.MeshBasicMaterial({ color: DAY_NIGHT.sunColor }));
   const moonMesh = new THREE.Mesh(new THREE.BoxGeometry(1, DAY_NIGHT.moonSize, DAY_NIGHT.moonSize), new THREE.MeshBasicMaterial({ color: DAY_NIGHT.moonColor }));
-  scene.add(sunMesh);
   scene.add(moonMesh);
 
   const clouds = createClouds(scene, { planeSize: 2048, centerY: 192, thickness: 5, pixelScale: 10 });
@@ -49,6 +47,28 @@ export function main() {
 
   const cm = new ChunkManager(scene, { seed: SEED, blockSize, viewDistance: gameSettings.viewDistance, debugOverlay });
 
+  const sunTexture = (cm.materials && cm.materials.sun && cm.materials.sun.map) ? cm.materials.sun.map : null;
+  const sunMaterial = new THREE.MeshBasicMaterial({ 
+    map: sunTexture, 
+    blending: THREE.AdditiveBlending, 
+    transparent: true, 
+    opacity: 0,
+    side: THREE.DoubleSide, 
+    depthWrite: false,});
+  if (sunMaterial) sunMaterial.toneMapped = false;
+  const sunMesh = new THREE.Mesh(new THREE.PlaneGeometry(DAY_NIGHT.sunSize, DAY_NIGHT.sunSize), sunMaterial);
+  sunMesh.renderOrder = 9998;
+  scene.add(sunMesh);
+  const sunBackdropMaterial = new THREE.MeshBasicMaterial({
+    color: DAY_NIGHT.sunBackdropColor !== undefined ? DAY_NIGHT.sunBackdropColor : 0x000000,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    transparent: false,
+  });
+  if (sunBackdropMaterial) sunBackdropMaterial.toneMapped = false;
+  const sunBackdropMesh = new THREE.Mesh(new THREE.PlaneGeometry(DAY_NIGHT.sunSize * 0.25, DAY_NIGHT.sunSize * 0.25), sunBackdropMaterial);
+  sunBackdropMesh.renderOrder = 9997;
+  scene.add(sunBackdropMesh);
   let waterPhysics = null;
   try {
     waterPhysics = new WaterPhysics(cm, scene);
@@ -332,7 +352,7 @@ export function main() {
     }
   };
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true , alpha: false,powerPreference: "high-performance", stencil: false, depth: true, preserveDrawingBuffer: false });
+  const renderer = new THREE.WebGLRenderer({ antialias: true , alpha: false,powerPreference: "high-performance", stencil: false, preserveDrawingBuffer: false });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.setPixelRatio(RENDER.maxPixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -594,12 +614,12 @@ export function main() {
     playerModel.position.y = 0;
     pitchObject.position.y = currentPlayerHeight * CAMERA.eyeHeight;
     let currentMaxSpeed = maxSpeed;
-    if (isCrouching) {
+    if (wantsToCrouch) {
       currentMaxSpeed = maxSpeed * crouchMultiplier;
     } else if (move.sprint && (move.forward)) {
       currentMaxSpeed = maxSpeed * sprintMultiplier;
     }
-    if (move.sprint && move.forward && !isCrouching && (velocity.x !== 0 || velocity.z !== 0)) {
+    if (move.sprint && move.forward && !wantsToCrouch && (velocity.x !== 0 || velocity.z !== 0)) {
       targetFov = sprintFov;
     } else {
       targetFov = defaultFov;
@@ -667,7 +687,7 @@ export function main() {
       const currentMaxGround = getMaxGroundAtPosition(player.position.x, player.position.z, currentBottomY);
       const targetMaxGround = getMaxGroundAtPosition(newX, player.position.z, currentBottomY);
       const CROUCH_MAX_DROP = 0.5;
-      if (onGround && isCrouching && isFinite(currentMaxGround) && isFinite(targetMaxGround) && (currentMaxGround - targetMaxGround) > CROUCH_MAX_DROP) {
+      if (onGround && wantsToCrouch && isFinite(currentMaxGround) && isFinite(targetMaxGround) && (currentMaxGround - targetMaxGround) > CROUCH_MAX_DROP) {
         velocity.x = 0;
       } else if (isPlayerPositionFree(newX, player.position.y, player.position.z)) {
         player.position.x = newX;
@@ -682,7 +702,7 @@ export function main() {
       const currentMaxGroundZ = getMaxGroundAtPosition(player.position.x, player.position.z, currentBottomYz);
       const targetMaxGroundZ = getMaxGroundAtPosition(player.position.x, newZ, currentBottomYz);
       const CROUCH_MAX_DROP_Z = 0.5;
-      if (onGround && isCrouching && isFinite(currentMaxGroundZ) && isFinite(targetMaxGroundZ) && (currentMaxGroundZ - targetMaxGroundZ) > CROUCH_MAX_DROP_Z) {
+      if (onGround && wantsToCrouch && isFinite(currentMaxGroundZ) && isFinite(targetMaxGroundZ) && (currentMaxGroundZ - targetMaxGroundZ) > CROUCH_MAX_DROP_Z) {
         velocity.z = 0;
       } else if (isPlayerPositionFree(player.position.x, player.position.y, newZ)) {
         player.position.z = newZ;
@@ -823,9 +843,22 @@ export function main() {
 
     const angle = (t / CYCLE_LENGTH) * Math.PI * 2 - Math.PI / 2;
     const sunDist = DAY_NIGHT.orbitDistance;
-    celestialPos.set(Math.cos(angle) * sunDist + player.position.x, Math.sin(angle) * sunDist, Math.sin(angle * 0.5) * -200 + player.position.z);
+    celestialPos.set(Math.cos(angle) * sunDist + player.position.x, Math.sin(angle) * sunDist, Math.sin(angle * 0.5)+ player.position.z);
     sunMesh.position.copy(celestialPos);
-    sunMesh.rotation.set(0, 0, angle);
+    // Orient the sun plane according to orbit angle so it behaves as a world object
+    sunMesh.rotation.set(Math.PI/2, angle - Math.PI/2, 0);
+    try {
+      if (sunBackdropMesh) {
+        if (DAY_NIGHT.sunBackdropColor !== undefined && sunBackdropMesh.material && sunBackdropMesh.material.color) {
+          sunBackdropMesh.material.color.set(DAY_NIGHT.sunBackdropColor);
+        }
+        const BACK_OFFSET = Math.max(5, DAY_NIGHT.sunSize * 0.02);
+        sunBackdropMesh.position.copy(sunMesh.position);
+        sunBackdropMesh.rotation.copy(sunMesh.rotation);
+        sunBackdropMesh.translateZ(-BACK_OFFSET);
+        sunBackdropMesh.visible = sunMesh.visible;
+      }
+    } catch (err) { console.warn('sun backdrop update failed', err); }
 
     const moonAngle = angle + Math.PI;
     celestialPos.set(Math.cos(moonAngle) * sunDist + player.position.x, Math.sin(moonAngle) * sunDist, Math.sin(moonAngle * 0.5) * -200 + player.position.z);
@@ -860,7 +893,12 @@ export function main() {
       ambientRatio = 0.2;
     }
     
-    if(sunIntensity === 0){
+    if (sunMesh && sunMesh.material) {
+      sunMesh.material.opacity = Math.max(0, Math.min(1, sunIntensity));
+      sunMesh.visible = sunIntensity > 0.01;
+    }
+
+    if (sunIntensity === 0) {
       scene.background = new THREE.Color(DAY_NIGHT.skyNightColor);
     }
 
@@ -897,7 +935,7 @@ export function main() {
     targetInfo = null;
     camera.getWorldPosition(tempLocalPoint);
     camera.getWorldDirection(tempWorldPoint);
-    const maxDist = raycaster.far || 50;
+    const maxDist = raycaster.far;
     const step = 0.1;
     for (let d = 0; d <= maxDist; d += step) {
       const sx = tempLocalPoint.x + tempWorldPoint.x * d;
