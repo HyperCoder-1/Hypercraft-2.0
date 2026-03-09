@@ -336,6 +336,7 @@ export default class ChunkManager {
     const obsidianMat = withMap('obsidian');
     const glowstoneMat = withMap('glowstone');
     const netherrackMat = withMap('netherrack');
+    const netherBrickMat = withMap('netherBricks');
     const soulSandMat = withMap('soulSand');
     const glassMat = mat({ map: T.glass, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
     const beaconMat = withMap('beacon');
@@ -360,6 +361,7 @@ export default class ChunkManager {
     const leatherBlockMat = withMap('leatherBlock');
     const stoneBrickSlabMat = withMap('stoneBrickSlab');
     const purpurSlabMat = withMap('purpurSlab');
+    const purpurBlockMat = withMap('purpurBlock');
     const prismarineSlabMat = withMap('prismarineSlab');
     const darkPrismarineSlabMat = withMap('darkPrismarineSlab');
     const prismarineBricksSlabMat = withMap('prismarineBricksSlab');
