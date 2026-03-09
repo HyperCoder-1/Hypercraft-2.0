@@ -327,8 +327,6 @@ export default class ChunkManager {
     const polishedBlackstoneBricksMat = withMap('polishedBlackstoneBricks');
     const endStoneBricksMat = withMap('endStoneBricks');
     const purpurPillarMat = withMap('purpurPillar');
-    const melonBlockMat = withMap('melon_side');
-
     const emeraldOreMat = withMap('emeraldOre');
     const emeraldBlockMat = withMap('emeraldBlock');
     const goldBlockMat = withMap('goldBlock');
