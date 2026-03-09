@@ -50,6 +50,42 @@
         transform: translateY(-50%);
       }
 
+      /* Hotbar Styles */
+      #hotbar {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        z-index: 10000;
+        background: rgba(0, 0, 0, 0.5);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+        padding: 4px;
+      }
+
+      .hotbar-slot {
+        width: 40px;
+        height: 40px;
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        margin: 1px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+      }
+
+      .hotbar-slot.selected {
+        border-color: white;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .hotbar-slot img {
+        max-width: 32px;
+        max-height: 32px;
+      }
+
       /* Main Menu Styles */
       #main-menu {
         position: fixed;
@@ -421,6 +457,17 @@
       </div>
     </div>
     <div id="credits">Textures from Minecraft © Mojang Studios / Microsoft — used for educational purposes.</div>
+    <div id="hotbar">
+      <div class="hotbar-slot selected" id="slot-0"></div>
+      <div class="hotbar-slot" id="slot-1"></div>
+      <div class="hotbar-slot" id="slot-2"></div>
+      <div class="hotbar-slot" id="slot-3"></div>
+      <div class="hotbar-slot" id="slot-4"></div>
+      <div class="hotbar-slot" id="slot-5"></div>
+      <div class="hotbar-slot" id="slot-6"></div>
+      <div class="hotbar-slot" id="slot-7"></div>
+      <div class="hotbar-slot" id="slot-8"></div>
+    </div>
     <div id="crosshair"></div>
     <script type="module" src="js/main.js"></script>
   </body>

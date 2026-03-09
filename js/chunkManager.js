@@ -22,6 +22,46 @@ const BLOCK_COAL_ORE = 10;
 const BLOCK_IRON_ORE = 11;
 const BLOCK_GOLD_ORE = 12;
 const BLOCK_DIAMOND_ORE = 13;
+const BLOCK_EMERALD_ORE = 64;
+const BLOCK_LAPIS_ORE = 65;
+const BLOCK_REDSTONE_ORE = 66;
+const BLOCK_NETHERRACK = 92;
+const BLOCK_NETHER_BRICK = 106;
+const BLOCK_SOUL_SAND = 93;
+const BLOCK_GLOWSTONE = 91;
+const BLOCK_QUARTZ_ORE = 102;
+const BLOCK_OBSIDIAN = 90;
+const BLOCK_CRYING_OBSIDIAN = 220;
+const BLOCK_ANCIENT_DEBRIS = 219;
+const BLOCK_BASALT = 212;
+const BLOCK_BLACKSTONE = 213;
+const BLOCK_POLISHED_BLACKSTONE = 214;
+const BLOCK_POLISHED_BLACKSTONE_BRICKS = 215;
+const BLOCK_END_STONE = 52;
+const BLOCK_END_STONE_BRICKS = 53;
+const BLOCK_PURPUR_BLOCK = 201;
+const BLOCK_PURPUR_PILLAR = 202;
+const BLOCK_OAK_PLANKS = 127;
+const BLOCK_SPRUCE_PLANKS = 128;
+const BLOCK_BIRCH_PLANKS = 129;
+const BLOCK_JUNGLE_PLANKS = 130;
+const BLOCK_ACACIA_PLANKS = 131;
+const BLOCK_DARK_OAK_PLANKS = 132;
+const BLOCK_PACKED_ICE = 96;
+const BLOCK_SNOW_BLOCK = 97;
+const BLOCK_CLAY_BLOCK = 98;
+const BLOCK_MELON_BLOCK = 117;
+const BLOCK_LEATHER_BLOCK = 118;
+const BLOCK_STONE_BRICK_SLAB = 200;
+const BLOCK_PURPUR_SLAB = 205;
+const BLOCK_PRISMARINE_SLAB = 206;
+const BLOCK_DARK_PRISMARINE_SLAB = 207;
+const BLOCK_PRISMARINE_BRICKS_SLAB = 208;
+const BLOCK_DISPLAY_CASE_BASE = 214;
+const BLOCK_DISPLAY_CASE_GLASS = 215;
+const BLOCK_DISPLAY_CASE_LIGHT = 216;
+const BLOCK_TITANIUM_BLOCK = 224;
+const BLOCK_STEEL_BLOCK = 225;
 const BLOCK_BEDROCK = 14;
 const BLOCK_CLAY = 15;
 const BLOCK_RED_SAND = 16;
@@ -207,7 +247,48 @@ export default class ChunkManager {
       sunflower: 'assets/textures/block/sunflower.png',
       oakLeaves: 'assets/textures/block/oak_leaves.png',
       waterStill: 'assets/textures/block/water_overlay.png',
-      sun: 'assets/textures/environment/sun.png'
+      sun: 'assets/textures/environment/sun.png',
+      emeraldOre: 'assets/textures/block/emerald_ore.png',
+      emeraldBlock: 'assets/textures/block/emerald_block.png',
+      goldBlock: 'assets/textures/block/gold_block.png',
+      ironBlock: 'assets/textures/block/iron_block.png',
+      coalBlock: 'assets/textures/block/coal_block.png',
+      diamondBlock: 'assets/textures/block/diamond_block.png',
+      obsidian: 'assets/textures/block/obsidian.png',
+      glowstone: 'assets/textures/block/glowstone.png',
+      netherrack: 'assets/textures/block/netherrack.png',
+      soulSand: 'assets/textures/block/soul_sand.png',
+      glass: 'assets/textures/block/glass.png',
+      beacon: 'assets/textures/block/beacon.png',
+      cobblestone: 'assets/textures/block/cobblestone.png',
+      mossyCobblestone: 'assets/textures/block/mossy_cobblestone.png',
+      stoneBricks: 'assets/textures/block/stone_bricks.png',
+      mossyStoneBricks: 'assets/textures/block/mossy_stone_bricks.png',
+      crackedStoneBricks: 'assets/textures/block/cracked_stone_bricks.png',
+      chiseledStoneBricks: 'assets/textures/block/chiseled_stone_bricks.png',
+      endStone: 'assets/textures/block/end_stone.png',
+      dragonEgg: 'assets/textures/block/dragon_egg.png',
+      oakPlanks: 'assets/textures/block/oak_planks.png',
+      sprucePlanks: 'assets/textures/block/spruce_planks.png',
+      birchPlanks: 'assets/textures/block/birch_planks.png',
+      junglePlanks: 'assets/textures/block/jungle_planks.png',
+      acaciaPlanks: 'assets/textures/block/acacia_planks.png',
+      darkOakPlanks: 'assets/textures/block/dark_oak_planks.png',
+      packedIce: 'assets/textures/block/packed_ice.png',
+      snowBlock: 'assets/textures/block/snow.png',
+      clayBlock: 'assets/textures/block/clay.png',
+      melonBlock: 'assets/textures/block/melon_side.png',
+      leatherBlock: 'assets/textures/block/brown_wool.png',
+      stoneBrickSlab: 'assets/textures/block/stone_bricks.png',
+      purpurSlab: 'assets/textures/block/purpur_block.png',
+      prismarineSlab: 'assets/textures/block/prismarine.png',
+      darkPrismarineSlab: 'assets/textures/block/dark_prismarine.png',
+      prismarineBricksSlab: 'assets/textures/block/prismarine_bricks.png',
+      displayCaseBase: 'assets/textures/block/stone.png',
+      displayCaseGlass: 'assets/textures/block/glass.png',
+      displayCaseLight: 'assets/textures/block/glowstone.png',
+      titaniumBlock: 'assets/textures/block/iron_block.png',
+      steelBlock: 'assets/textures/block/iron_block.png'
     };
 
     const T = {};
@@ -234,6 +315,61 @@ export default class ChunkManager {
     const ironOreMat = withMap('ironOre');
     const goldOreMat = withMap('goldOre');
     const diamondOreMat = withMap('diamondOre');
+
+    const lapisOreMat = withMap('lapisOre');
+    const redstoneOreMat = withMap('redstoneOre');
+    const quartzOreMat = withMap('quartzOre');
+    const cryingObsidianMat = withMap('cryingObsidian');
+    const ancientDebrisMat = withMap('ancient_debris_side');
+    const basaltMat = withMap('basalt_side');
+    const blackstoneMat = withMap('blackstone');
+    const polishedBlackstoneMat = withMap('polishedBlackstone');
+    const polishedBlackstoneBricksMat = withMap('polishedBlackstoneBricks');
+    const endStoneBricksMat = withMap('endStoneBricks');
+    const purpurPillarMat = withMap('purpurPillar');
+    const melonBlockMat = withMap('melon_side');
+
+    const emeraldOreMat = withMap('emeraldOre');
+    const emeraldBlockMat = withMap('emeraldBlock');
+    const goldBlockMat = withMap('goldBlock');
+    const ironBlockMat = withMap('ironBlock');
+    const coalBlockMat = withMap('coalBlock');
+    const diamondBlockMat = withMap('diamondBlock');
+    const obsidianMat = withMap('obsidian');
+    const glowstoneMat = withMap('glowstone');
+    const netherrackMat = withMap('netherrack');
+    const soulSandMat = withMap('soulSand');
+    const glassMat = mat({ map: T.glass, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
+    const beaconMat = withMap('beacon');
+    const cobblestoneMat = withMap('cobblestone');
+    const mossyCobblestoneMat = withMap('mossyCobblestone');
+    const stoneBricksMat = withMap('stoneBricks');
+    const mossyStoneBricksMat = withMap('mossyStoneBricks');
+    const crackedStoneBricksMat = withMap('crackedStoneBricks');
+    const chiseledStoneBricksMat = withMap('chiseledStoneBricks');
+    const endStoneMat = withMap('endStone');
+    const dragonEggMat = withMap('dragonEgg');
+    const oakPlanksMat = withMap('oakPlanks');
+    const sprucePlanksMat = withMap('sprucePlanks');
+    const birchPlanksMat = withMap('birchPlanks');
+    const junglePlanksMat = withMap('junglePlanks');
+    const acaciaPlanksMat = withMap('acaciaPlanks');
+    const darkOakPlanksMat = withMap('darkOakPlanks');
+    const packedIceMat = withMap('packedIce');
+    const snowBlockMat = withMap('snowBlock');
+    const clayBlockMat = withMap('clayBlock');
+    const melonBlockMat = withMap('melonBlock');
+    const leatherBlockMat = withMap('leatherBlock');
+    const stoneBrickSlabMat = withMap('stoneBrickSlab');
+    const purpurSlabMat = withMap('purpurSlab');
+    const prismarineSlabMat = withMap('prismarineSlab');
+    const darkPrismarineSlabMat = withMap('darkPrismarineSlab');
+    const prismarineBricksSlabMat = withMap('prismarineBricksSlab');
+    const displayCaseBaseMat = withMap('displayCaseBase');
+    const displayCaseGlassMat = withMap('displayCaseGlass');
+    const displayCaseLightMat = withMap('displayCaseLight');
+    const titaniumBlockMat = withMap('titaniumBlock');
+    const steelBlockMat = withMap('steelBlock');
 
     const woodSideMat = withMap('oakSide');
     const woodTopMat = withMap('oakTop');
@@ -273,6 +409,46 @@ export default class ChunkManager {
       ironOre: ironOreMat,
       goldOre: goldOreMat,
       diamondOre: diamondOreMat,
+      emeraldOre: emeraldOreMat,
+      lapisOre: lapisOreMat,
+      redstoneOre: redstoneOreMat,
+      netherrack: netherrackMat,
+      netherBrick: netherBrickMat,
+      soulSand: soulSandMat,
+      glowstone: glowstoneMat,
+      quartzOre: quartzOreMat,
+      obsidian: obsidianMat,
+      cryingObsidian: cryingObsidianMat,
+      ancientDebris: ancientDebrisMat,
+      basalt: basaltMat,
+      blackstone: blackstoneMat,
+      polishedBlackstone: polishedBlackstoneMat,
+      polishedBlackstoneBricks: polishedBlackstoneBricksMat,
+      endStone: endStoneMat,
+      endStoneBricks: endStoneBricksMat,
+      purpurBlock: purpurBlockMat,
+      purpurPillar: purpurPillarMat,
+      oakPlanks: oakPlanksMat,
+      sprucePlanks: sprucePlanksMat,
+      birchPlanks: birchPlanksMat,
+      junglePlanks: junglePlanksMat,
+      acaciaPlanks: acaciaPlanksMat,
+      darkOakPlanks: darkOakPlanksMat,
+      packedIce: packedIceMat,
+      snowBlock: snowBlockMat,
+      clayBlock: clayBlockMat,
+      melonBlock: melonBlockMat,
+      leatherBlock: leatherBlockMat,
+      stoneBrickSlab: stoneBrickSlabMat,
+      purpurSlab: purpurSlabMat,
+      prismarineSlab: prismarineSlabMat,
+      darkPrismarineSlab: darkPrismarineSlabMat,
+      prismarineBricksSlab: prismarineBricksSlabMat,
+      displayCaseBase: displayCaseBaseMat,
+      displayCaseGlass: displayCaseGlassMat,
+      displayCaseLight: displayCaseLightMat,
+      titaniumBlock: titaniumBlockMat,
+      steelBlock: steelBlockMat,
       // Cross-model plants
       deadBush: deadBushMat,
       tallGrass: tallGrassMat,
@@ -665,6 +841,126 @@ export default class ChunkManager {
                 break;
               case BLOCK_DIAMOND_ORE:
                 matKey = 'diamondOre';
+                break;
+              case BLOCK_EMERALD_ORE:
+                matKey = 'emeraldOre';
+                break;
+              case BLOCK_LAPIS_ORE:
+                matKey = 'lapisOre';
+                break;
+              case BLOCK_REDSTONE_ORE:
+                matKey = 'redstoneOre';
+                break;
+              case BLOCK_NETHERRACK:
+                matKey = 'netherrack';
+                break;
+              case BLOCK_NETHER_BRICK:
+                matKey = 'netherBrick';
+                break;
+              case BLOCK_SOUL_SAND:
+                matKey = 'soulSand';
+                break;
+              case BLOCK_GLOWSTONE:
+                matKey = 'glowstone';
+                break;
+              case BLOCK_QUARTZ_ORE:
+                matKey = 'quartzOre';
+                break;
+              case BLOCK_OBSIDIAN:
+                matKey = 'obsidian';
+                break;
+              case BLOCK_CRYING_OBSIDIAN:
+                matKey = 'cryingObsidian';
+                break;
+              case BLOCK_ANCIENT_DEBRIS:
+                matKey = 'ancientDebris';
+                break;
+              case BLOCK_BASALT:
+                matKey = 'basalt';
+                break;
+              case BLOCK_BLACKSTONE:
+                matKey = 'blackstone';
+                break;
+              case BLOCK_POLISHED_BLACKSTONE:
+                matKey = 'polishedBlackstone';
+                break;
+              case BLOCK_POLISHED_BLACKSTONE_BRICKS:
+                matKey = 'polishedBlackstoneBricks';
+                break;
+              case BLOCK_END_STONE:
+                matKey = 'endStone';
+                break;
+              case BLOCK_END_STONE_BRICKS:
+                matKey = 'endStoneBricks';
+                break;
+              case BLOCK_PURPUR_BLOCK:
+                matKey = 'purpurBlock';
+                break;
+              case BLOCK_PURPUR_PILLAR:
+                matKey = 'purpurPillar';
+                break;
+              case BLOCK_OAK_PLANKS:
+                matKey = 'oakPlanks';
+                break;
+              case BLOCK_SPRUCE_PLANKS:
+                matKey = 'sprucePlanks';
+                break;
+              case BLOCK_BIRCH_PLANKS:
+                matKey = 'birchPlanks';
+                break;
+              case BLOCK_JUNGLE_PLANKS:
+                matKey = 'junglePlanks';
+                break;
+              case BLOCK_ACACIA_PLANKS:
+                matKey = 'acaciaPlanks';
+                break;
+              case BLOCK_DARK_OAK_PLANKS:
+                matKey = 'darkOakPlanks';
+                break;
+              case BLOCK_PACKED_ICE:
+                matKey = 'packedIce';
+                break;
+              case BLOCK_SNOW_BLOCK:
+                matKey = 'snowBlock';
+                break;
+              case BLOCK_CLAY_BLOCK:
+                matKey = 'clayBlock';
+                break;
+              case BLOCK_MELON_BLOCK:
+                matKey = 'melonBlock';
+                break;
+              case BLOCK_LEATHER_BLOCK:
+                matKey = 'leatherBlock';
+                break;
+              case BLOCK_STONE_BRICK_SLAB:
+                matKey = 'stoneBrickSlab';
+                break;
+              case BLOCK_PURPUR_SLAB:
+                matKey = 'purpurSlab';
+                break;
+              case BLOCK_PRISMARINE_SLAB:
+                matKey = 'prismarineSlab';
+                break;
+              case BLOCK_DARK_PRISMARINE_SLAB:
+                matKey = 'darkPrismarineSlab';
+                break;
+              case BLOCK_PRISMARINE_BRICKS_SLAB:
+                matKey = 'prismarineBricksSlab';
+                break;
+              case BLOCK_DISPLAY_CASE_BASE:
+                matKey = 'displayCaseBase';
+                break;
+              case BLOCK_DISPLAY_CASE_GLASS:
+                matKey = 'displayCaseGlass';
+                break;
+              case BLOCK_DISPLAY_CASE_LIGHT:
+                matKey = 'displayCaseLight';
+                break;
+              case BLOCK_TITANIUM_BLOCK:
+                matKey = 'titaniumBlock';
+                break;
+              case BLOCK_STEEL_BLOCK:
+                matKey = 'steelBlock';
                 break;
               default:
                 matKey = 'stone';

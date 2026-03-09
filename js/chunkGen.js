@@ -11,10 +11,50 @@ export const MAX_Y = 319;
 export const HEIGHT = MAX_Y - MIN_Y + 1; // 384
 
 // Block IDs:
-// 0=air, 1=stone, 2=dirt, 3=grass, 4=water, 5=sand, 6=oak_log, 7=oak_leaves
-// 8=grass_snow (snowy grass), 9=gravel, 10=coal_ore, 11=iron_ore, 12=gold_ore, 13=diamond_ore
-// 14=bedrock, 15=clay, 16=red_sand, 17=snow, 18=ice, 19=cactus
-// 20=dead_bush, 21=tall_grass, 22=rose_bush, 23=sunflower
+// 0=air, 1=stone, 2=dirt, 3=grass, 4=water, 5=sand, 6=oak_log, 7=oak_leaves, 
+// 8=grass_snow (snowy grass), 9=gravel, 10=coal_ore, 11=iron_ore, 12=gold_ore, 13=diamond_ore, 
+// 14=bedrock, 15=clay, 16=red_sand, 17=snow, 18=ice, 19=cactus, 
+// 20=dead_bush, 21=tall_grass, 22=rose_bush, 23=sunflower, 24=oak_sapling, 25=spruce_sapling, 
+// 26=birch_sapling, 27=jungle_sapling, 28=acacia_sapling, 29=dark_oak_sapling, 30=mushroom_block, 
+// 31=spruce_leaves, 32=birch_leaves, 33=jungle_leaves, 34=acacia_leaves, 35=dark_oak_leaves, 
+// 36=birch_log, 37=spruce_log, 38=jungle_log, 39=acacia_log, 40=dark_oak_log, 
+// 41=melon, 42=pumpkin, 43=vine, 44=lily_pad, 45=nether_portal, 46=end_portal, 47=end_portal_frame, 
+// 48=anvil, 49=enchanting_table, 50=brewing_stand, 51=cauldron, 52=end_stone, 53=dragon_egg, 
+// 54=portal_block, 55=carved_pumpkin, 56=jack_o_lantern, 57=cocoa, 58=sandstone, 59=red_sandstone, 
+// 60=red_sandstone_stairs, 61=red_sandstone_slab, 62=sandstone_stairs, 63=sandstone_slab, 
+// 64=emerald_ore, 65=emerald_block, 66=chest, 67=trapped_chest, 68=ender_chest, 69=hay_block, 
+// 70=white_wool, 71=orange_wool, 72=magenta_wool, 73=light_blue_wool, 74=yellow_wool, 
+// 75=lime_wool, 76=pink_wool, 77=gray_wool, 78=light_gray_wool, 79=cyan_wool, 
+// 80=purple_wool, 81=blue_wool, 82=brown_wool, 83=green_wool, 84=red_wool, 85=black_wool, 
+// 86=gold_block, 87=iron_block, 88=coal_block, 89=diamond_block, 90=obsidian, 91=glowstone, 
+// 92=netherrack, 93=soul_sand, 94=glass, 95=glass_pane, 96=ice_block, 97=snow_block, 
+// 98=clay_block, 99=farmland, 100=hopper, 101=redstone_block, 102=quartz_ore, 103=quartz_block, 
+// 104=quartz_stairs, 105=quartz_slab, 106=nether_bricks, 107=nether_brick_fence, 
+// 108=nether_brick_stairs, 109=nether_brick_slab, 110=nether_wart, 111=nether_wart_block, 
+// 112=red_nether_bricks, 113=bone_block, 114=structure_block, 115=iron_bars, 116=glass_pane, 
+// 117=melon_block, 118=leather_block, 119=command_block, 120=beacon, 121=cobblestone, 122=mossy_cobblestone,
+// 123=stone_bricks, 124=mossy_stone_bricks, 125=cracked_stone_bricks, 126=chiseled_stone_bricks,
+// 127=oak_planks_block, 128=spruce_planks_block, 129=birch_planks_block, 130=jungle_planks_block, 
+// 131=acacia_planks_block, 132=dark_oak_planks_block, 133=oak_stairs, 134=spruce_stairs, 135=birch_stairs, 
+// 136=jungle_stairs, 137=acacia_stairs, 138=dark_oak_stairs, 139=oak_slab, 140=spruce_slab, 141=birch_slab, 
+// 142=jungle_slab, 143=acacia_slab, 144=dark_oak_slab, 145=oak_fence, 146=spruce_fence, 147=birch_fence, 
+// 148=jungle_fence, 149=acacia_fence, 150=dark_oak_fence, 151=oak_fence_gate, 152=spruce_fence_gate, 
+// 153=birch_fence_gate, 154=jungle_fence_gate, 155=acacia_fence_gate, 156=dark_oak_fence_gate, 157=oak_door, 
+// 158=spruce_door, 159=birch_door, 160=jungle_door, 161=acacia_door, 162=dark_oak_door, 163=iron_door, 
+// 164=oak_trapdoor, 165=spruce_trapdoor, 166=birch_trapdoor, 167=jungle_trapdoor, 168=acacia_trapdoor, 
+// 169=dark_oak_trapdoor, 170=iron_trapdoor, 171=oak_pressure_plate, 172=spruce_pressure_plate, 
+// 173=birch_pressure_plate, 174=jungle_pressure_plate, 175=acacia_pressure_plate, 176=dark_oak_pressure_plate, 
+// 177=iron_pressure_plate, 178=oak_button, 179=spruce_button, 180=birch_button, 181=jungle_button, 
+// 182=acacia_button, 183=dark_oak_button, 184=stone_button, 185=polished_andesite, 186=andesite, 
+// 187=polished_diorite, 188=diorite, 189=polished_granite, 190=granite, 191=andesite_stairs, 192=diorite_stairs, 
+// 193=granite_stairs, 194=andesite_slab, 195=diorite_slab, 196=granite_slab, 197=stone_slab, 198=cobblestone_slab, 
+// 199=brick_slab, 200=stone_brick_slab, 201=nether_brick_slab, 202=quartz_slab, 203=red_sandstone_slab, 
+// 204=sandstone_slab, 205=purpur_slab, 206=prismarine_slab, 207=dark_prismarine_slab, 208=prismarine_bricks_slab, 
+// 209=prismarine, 210=prismarine_bricks, 211=dark_prismarine, 212=sea_lantern, 213=hay_block, 
+// 214=display_case_base_block, 215=display_case_glass_block, 216=display_case_light_block, 217=nether_gold_ore, 
+// 218=nether_quartz_ore, 219=ancient_debris, 220=crying_obsidian, 221=respawn_anchor, 222=lodestone, 
+// 223=netherite_block, 224=titanium_block, 225=steel_block, 226=target_block, 227=beehive, 228=honey_block, 
+// 229=honeycomb_block, 
 
 // Biome IDs
 const BIOME = {
