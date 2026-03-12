@@ -157,20 +157,21 @@ export default class BlockBreaker {
       return;
     }
 
+    // if somehow the current target becomes bedrock, abort immediately
+    if (this.target && this.target.bid === 14) {
+      this.stopBreaking();
+      return;
+    }
+
     if (!this.target) {
+      // generic abort when we lost the target
       if (!this._mouseDown) { this.stopBreaking(); return; }
       const next = this._findTarget();
       if (next && next.bid !== 14) {
         this.target = next; this.elapsed = 0; this._ensureOverlay(); this._updateOverlay(0); return;
       }
-      if (this.overlayMeshes && this.scene) {
-        for (const entry of this.overlayMeshes) {
-          try { this.scene.remove(entry.mesh); } catch (e) {}
-          entry.added = false;
-        }
-      }
-      this.active = false;
-      this.target = null;
+      // hit nothing or bedrock while still holding; stop completely
+      this.stopBreaking();
       return;
     }
 
@@ -207,6 +208,11 @@ export default class BlockBreaker {
     const stage = Math.floor(pct * this.stages);
     this._updateOverlay(stage);
     if (this.elapsed >= this.totalTime) {
+      // final guard against bedrock just in case
+      if (this.target && this.target.bid === 14) {
+        this.stopBreaking();
+        return;
+      }
       const px = this.target.bx + 0.5;
       const py = this.target.by + 0.5;
       const pz = this.target.bz + 0.5;
