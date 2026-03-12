@@ -35,6 +35,7 @@ export const texturePaths = {
   sunflower: 'assets/textures/block/sunflower.png',
   oakLeaves: 'assets/textures/block/oak_leaves.png',
   waterStill: 'assets/textures/block/water_overlay.png',
+  craftingTable: 'assets/textures/block/crafting_table_top.png',
   sun: 'assets/textures/environment/sun.png',
   emeraldOre: 'assets/textures/block/emerald_ore.png',
   emeraldBlock: 'assets/textures/block/emerald_block.png',
@@ -116,6 +117,7 @@ export function getTextureKeyForBlockId(id) {
     case BLOCK_TALL_GRASS: return 'tallGrass';
     case BLOCK_ROSE_BUSH: return 'roseBush';
     case BLOCK_SUNFLOWER: return 'sunflower';
+    case BLOCK_CRAFTING_TABLE: return 'craftingTable';
     default: return null;
   }
 }
@@ -141,10 +143,12 @@ export const BLOCK_DEAD_BUSH = 20;
 export const BLOCK_TALL_GRASS = 21;
 export const BLOCK_ROSE_BUSH = 22;
 export const BLOCK_SUNFLOWER = 23;
+export const BLOCK_CRAFTING_TABLE = 24; // added for recipes
 
 // Common blocks that will be exposed in the creative inventory
 export const CREATIVE_BLOCKS = [
   BLOCK_STONE,
+  BLOCK_CRAFTING_TABLE,
   BLOCK_DIRT,
   BLOCK_GRASS,
   BLOCK_SAND,

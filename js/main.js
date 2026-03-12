@@ -9,7 +9,7 @@ import createDebugOverlay from './debugOverlay.js';
 import { SEED, PLAYER, PHYSICS, RENDER, DAY_NIGHT, CAMERA, DEBUG } from './config.js';
 import WaterPhysics from './waterPhysics.js';
 import Inventory from './inventory.js';
-import { BLOCK_DIRT, BLOCK_STONE, BLOCK_WOOD } from './chunkManager.js';
+import { BLOCK_DIRT, BLOCK_STONE, BLOCK_WOOD, BLOCK_CRAFTING_TABLE } from './chunkManager.js';
 
 
 
@@ -443,6 +443,37 @@ export function main() {
         break;
       case 'KeyB':
         try { cm.toggleChunkBorders(); } catch (err) { console.warn('toggleChunkBorders error', err); }
+        break;
+      case 'KeyE':
+        e.preventDefault();
+        // if crafting window already open, just close it
+        if (inventory && inventory.craftOverlay && !inventory.craftOverlay.classList.contains('hidden')) {
+          inventory.closeCrafting();
+          break;
+        }
+        // otherwise raycast to see what we're pointing at
+        {
+          const origin = camera.getWorldPosition(new THREE.Vector3());
+          const dir = new THREE.Vector3();
+          camera.getWorldDirection(dir);
+          const step = 0.1;
+          let opened = false;
+          for (let t = 0; t <= PLAYER.blockreach; t += step) {
+            const p = origin.clone().addScaledVector(dir, t);
+            const bid = cm.getBlockAtWorld(p.x, p.y, p.z);
+            if (bid !== 0) {
+              if (bid === BLOCK_CRAFTING_TABLE) {
+                inventory.openCrafting();
+                opened = true;
+              } else {
+                inventory.toggleInventory();
+                opened = true;
+              }
+              break;
+            }
+          }
+          if (!opened) inventory.toggleInventory();
+        }
         break;
       case 'KeyQ':
         e.preventDefault();
