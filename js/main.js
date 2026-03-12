@@ -5,6 +5,7 @@ import { CHUNK_SIZE, MIN_Y, getBiomeAtWorld } from './chunkGen.js';
 import ChunkManager, { isBlockPassable } from './chunkManager.js';
 import { initInteraction } from './interaction.js';
 import BlockBreaker from './blockBreaker.js';
+import ItemManager from './itemManager.js';
 import createDebugOverlay from './debugOverlay.js';
 import { SEED, PLAYER, PHYSICS, RENDER, DAY_NIGHT, CAMERA, DEBUG } from './config.js';
 import WaterPhysics from './waterPhysics.js';
@@ -388,7 +389,8 @@ export function main() {
 
   const blockBreaker = new BlockBreaker(cm, scene, camera, { 
     reach: PLAYER.blockreach,
-    getFirstPersonRay
+    getFirstPersonRay,
+    itemManager: null  // will be set after itemManager creation
   });
 
   const interaction = initInteraction(cm, camera, renderer.domElement, {
@@ -396,6 +398,7 @@ export function main() {
     reach: PLAYER.blockreach,
     blockBreaker,
     getFirstPersonRay,
+    itemManager: null,  // will be set after itemManager creation
     getPlayerAABB: () => ({
       minX: player.position.x - playerHalfWidth,
       maxX: player.position.x + playerHalfWidth,
@@ -407,8 +410,16 @@ export function main() {
     })
   });
 
+  // create item manager for dropped item entities
+  const itemManager = new ItemManager(cm, scene, null);  // inventory will be passed after creation
+  // now set itemManager on blockBreaker and interaction
+  blockBreaker.itemManager = itemManager;
+  interaction.setItemManager(itemManager);
+
   // create inventory manager (hotbar + creative inventory)
   const inventory = new Inventory(interaction);
+  // also set inventory on itemManager so it can add items
+  itemManager.inventory = inventory;
   // some default starting blocks for survival mode
   inventory.setSlot(0, BLOCK_DIRT);
   inventory.setSlot(1, BLOCK_STONE);
@@ -1071,6 +1082,20 @@ export function main() {
       updateFirstPersonCameraCollision();
     }
     try { if (typeof blockBreaker !== 'undefined' && blockBreaker) blockBreaker.update(frameDelta); } catch (e) {}
+    // update item entities
+    try {
+      if (typeof itemManager !== 'undefined' && itemManager) {
+        const playerAABB = {
+          minX: player.position.x - playerHalfWidth,
+          maxX: player.position.x + playerHalfWidth,
+          minY: player.position.y - currentPlayerHeight / 2,
+          maxY: player.position.y + currentPlayerHeight / 2,
+          minZ: player.position.z - playerHalfDepth,
+          maxZ: player.position.z + playerHalfDepth
+        };
+        itemManager.update(frameDelta, playerAABB);
+      }
+    } catch (e) {}
     renderer.render(scene, camera);
     prevTime = time;
   }

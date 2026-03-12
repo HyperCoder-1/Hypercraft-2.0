@@ -63,6 +63,10 @@ export function initInteraction(cm, camera, domElement, opts = {}) {
             return;
           }
           cm.setBlockAtWorld(hx + 0.5, hy + 0.5, hz + 0.5, 0);
+          // Spawn item entity
+          if (opts.itemManager && bid !== 0 && bid !== 14) {
+            opts.itemManager.spawnItem(bid, hx + 0.5, hy + 0.5, hz + 0.5);
+          }
         } else if (button === 2) {
 
             const px = Math.floor(prev.x);
@@ -146,6 +150,7 @@ export function initInteraction(cm, camera, domElement, opts = {}) {
 
   return {
     setPlaceBlock(id) { placeBlockId = id; },
+    setItemManager(im) { opts.itemManager = im; },
     dispose() {
       stopPlacing();
       domElement.removeEventListener('contextmenu', onContextMenu);

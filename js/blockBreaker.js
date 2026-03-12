@@ -6,6 +6,7 @@ export default class BlockBreaker {
     this.cm = cm;
     this.scene = scene;
     this.camera = camera;
+    this.itemManager = opts.itemManager ?? null;
     this.reach = PLAYER.blockreach;
     this.totalTime = opts.totalTime ?? 1000;
     this.stages = opts.stages ?? 10;
@@ -216,7 +217,12 @@ export default class BlockBreaker {
       const px = this.target.bx + 0.5;
       const py = this.target.by + 0.5;
       const pz = this.target.bz + 0.5;
+      const blockId = this.target.bid;
       this.cm.setBlockAtWorld(px, py, pz, 0);
+      // Spawn item entity
+      if (this.itemManager && blockId !== 0 && blockId !== 14) {
+        this.itemManager.spawnItem(blockId, px, py, pz);
+      }
       if (this._mouseDown) {
         const newT = this._findTarget();
         if (newT && newT.bid !== 14) {
