@@ -174,7 +174,11 @@ export default class BlockBreaker {
       return;
     }
 
-    const t = this._findTarget();
+    let t = this._findTarget();
+    // ignore bedrock targets - treat as if there's no hit
+    if (t && t.bid === 14) {
+      t = null;
+    }
     if (!t) {
       if (!this._mouseDown) { this.stopBreaking(); return; }
       if (this.overlayMeshes && this.scene) {
@@ -189,6 +193,11 @@ export default class BlockBreaker {
     }
     if (t.bx !== this.target.bx || t.by !== this.target.by || t.bz !== this.target.bz) {
       if (this._mouseDown) {
+        // don't switch to bedrock even if it's now under the crosshair
+        if (t.bid === 14) {
+          this.stopBreaking();
+          return;
+        }
         this.target = t; this.elapsed = 0; this._ensureOverlay(); this._updateOverlay(0); return;
       } else { this.stopBreaking(); return; }
     }
