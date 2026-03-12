@@ -8,6 +8,8 @@ import BlockBreaker from './blockBreaker.js';
 import createDebugOverlay from './debugOverlay.js';
 import { SEED, PLAYER, PHYSICS, RENDER, DAY_NIGHT, CAMERA, DEBUG } from './config.js';
 import WaterPhysics from './waterPhysics.js';
+import Inventory from './inventory.js';
+import { BLOCK_DIRT, BLOCK_STONE, BLOCK_WOOD } from './chunkManager.js';
 
 
 
@@ -398,11 +400,21 @@ export function main() {
       minX: player.position.x - playerHalfWidth,
       maxX: player.position.x + playerHalfWidth,
       minY: player.position.y - currentPlayerHeight / 2,
+
       maxY: player.position.y + currentPlayerHeight / 2,
       minZ: player.position.z - playerHalfDepth,
       maxZ: player.position.z + playerHalfDepth
     })
   });
+
+  // create inventory manager (hotbar + creative inventory)
+  const inventory = new Inventory(interaction);
+  // some default starting blocks for survival mode
+  inventory.setSlot(0, BLOCK_DIRT);
+  inventory.setSlot(1, BLOCK_STONE);
+  inventory.setSlot(2, BLOCK_WOOD);
+  // make accessible from console for debugging
+  window.inventory = inventory;
 
   const move = { forward: false, backward: false, left: false, right: false, sprint: false, crouch: false };
   

@@ -7,71 +7,163 @@ import { SEED, RENDER, TREES, DEBUG, COLORS } from './config.js';
 import * as THREE from './three.module.js';
 import { calculateChunkLighting, lightToRenderBrightness } from './lighting.js';
 
-// Block IDs
-const BLOCK_AIR = 0;
-const BLOCK_STONE = 1;
-const BLOCK_DIRT = 2;
-const BLOCK_GRASS = 3;
-const BLOCK_WATER = 4;
-const BLOCK_SAND = 5;
-const BLOCK_WOOD = 6;
-const BLOCK_LEAVES = 7;
-const BLOCK_GRASS_SNOW = 8;
-const BLOCK_GRAVEL = 9;
-const BLOCK_COAL_ORE = 10;
-const BLOCK_IRON_ORE = 11;
-const BLOCK_GOLD_ORE = 12;
-const BLOCK_DIAMOND_ORE = 13;
-const BLOCK_EMERALD_ORE = 64;
-const BLOCK_LAPIS_ORE = 65;
-const BLOCK_REDSTONE_ORE = 66;
-const BLOCK_NETHERRACK = 92;
-const BLOCK_NETHER_BRICK = 106;
-const BLOCK_SOUL_SAND = 93;
-const BLOCK_GLOWSTONE = 91;
-const BLOCK_QUARTZ_ORE = 102;
-const BLOCK_OBSIDIAN = 90;
-const BLOCK_CRYING_OBSIDIAN = 220;
-const BLOCK_ANCIENT_DEBRIS = 219;
-const BLOCK_BASALT = 212;
-const BLOCK_BLACKSTONE = 213;
-const BLOCK_POLISHED_BLACKSTONE = 214;
-const BLOCK_POLISHED_BLACKSTONE_BRICKS = 215;
-const BLOCK_END_STONE = 52;
-const BLOCK_END_STONE_BRICKS = 53;
-const BLOCK_PURPUR_BLOCK = 201;
-const BLOCK_PURPUR_PILLAR = 202;
-const BLOCK_OAK_PLANKS = 127;
-const BLOCK_SPRUCE_PLANKS = 128;
-const BLOCK_BIRCH_PLANKS = 129;
-const BLOCK_JUNGLE_PLANKS = 130;
-const BLOCK_ACACIA_PLANKS = 131;
-const BLOCK_DARK_OAK_PLANKS = 132;
-const BLOCK_PACKED_ICE = 96;
-const BLOCK_SNOW_BLOCK = 97;
-const BLOCK_CLAY_BLOCK = 98;
-const BLOCK_MELON_BLOCK = 117;
-const BLOCK_LEATHER_BLOCK = 118;
-const BLOCK_STONE_BRICK_SLAB = 200;
-const BLOCK_PURPUR_SLAB = 205;
-const BLOCK_PRISMARINE_SLAB = 206;
-const BLOCK_DARK_PRISMARINE_SLAB = 207;
-const BLOCK_PRISMARINE_BRICKS_SLAB = 208;
-const BLOCK_DISPLAY_CASE_BASE = 214;
-const BLOCK_DISPLAY_CASE_GLASS = 215;
-const BLOCK_DISPLAY_CASE_LIGHT = 216;
-const BLOCK_TITANIUM_BLOCK = 224;
-const BLOCK_STEEL_BLOCK = 225;
-const BLOCK_BEDROCK = 14;
-const BLOCK_CLAY = 15;
-const BLOCK_RED_SAND = 16;
-const BLOCK_SNOW = 17;
-const BLOCK_ICE = 18;
-const BLOCK_CACTUS = 19;
-const BLOCK_DEAD_BUSH = 20;
-const BLOCK_TALL_GRASS = 21;
-const BLOCK_ROSE_BUSH = 22;
-const BLOCK_SUNFLOWER = 23;
+// mapping of logical texture names to file paths (shared with inventory/ui)
+export const texturePaths = {
+  dirt: 'assets/textures/block/dirt.png',
+  sand: 'assets/textures/block/sand.png',
+  grassSide: 'assets/textures/block/grass_block_side.png',
+  grassSideOverlay: 'assets/textures/block/grass_block_side_overlay.png',
+  grassTop: 'assets/textures/block/grass_block_top.png',
+  stone: 'assets/textures/block/stone.png',
+  gravel: 'assets/textures/block/gravel.png',
+  clay: 'assets/textures/block/clay.png',
+  redSand: 'assets/textures/block/red_sand.png',
+  bedrock: 'assets/textures/block/bedrock.png',
+  snow: 'assets/textures/block/snow.png',
+  ice: 'assets/textures/block/ice.png',
+  coalOre: 'assets/textures/block/coal_ore.png',
+  ironOre: 'assets/textures/block/iron_ore.png',
+  goldOre: 'assets/textures/block/gold_ore.png',
+  diamondOre: 'assets/textures/block/diamond_ore.png',
+  oakSide: 'assets/textures/block/oak_log.png',
+  oakTop: 'assets/textures/block/oak_log_top.png',
+  cactus: 'assets/textures/block/cactus.png',
+  grassSnowSide: 'assets/textures/block/grass_block_snow_side.png',
+  deadBush: 'assets/textures/block/dead_bush.png',
+  tallGrass: 'assets/textures/block/tall_grass_top.png',
+  roseBush: 'assets/textures/block/rose_bush_top.png',
+  sunflower: 'assets/textures/block/sunflower.png',
+  oakLeaves: 'assets/textures/block/oak_leaves.png',
+  waterStill: 'assets/textures/block/water_overlay.png',
+  sun: 'assets/textures/environment/sun.png',
+  emeraldOre: 'assets/textures/block/emerald_ore.png',
+  emeraldBlock: 'assets/textures/block/emerald_block.png',
+  goldBlock: 'assets/textures/block/gold_block.png',
+  ironBlock: 'assets/textures/block/iron_block.png',
+  coalBlock: 'assets/textures/block/coal_block.png',
+  diamondBlock: 'assets/textures/block/diamond_block.png',
+  obsidian: 'assets/textures/block/obsidian.png',
+  glowstone: 'assets/textures/block/glowstone.png',
+  netherrack: 'assets/textures/block/netherrack.png',
+  soulSand: 'assets/textures/block/soul_sand.png',
+  // ... etc; the same object will be referenced by _createMaterials and inventory
+};
+
+
+
+// Block IDs (exported for use by inventory and other systems)
+export const BLOCK_AIR = 0;
+export const BLOCK_STONE = 1;
+export const BLOCK_DIRT = 2;
+export const BLOCK_GRASS = 3;
+export const BLOCK_WATER = 4;
+export const BLOCK_SAND = 5;
+export const BLOCK_WOOD = 6;
+export const BLOCK_LEAVES = 7;
+export const BLOCK_GRASS_SNOW = 8;
+export const BLOCK_GRAVEL = 9;
+export const BLOCK_COAL_ORE = 10;
+export const BLOCK_IRON_ORE = 11;
+export const BLOCK_GOLD_ORE = 12;
+export const BLOCK_DIAMOND_ORE = 13;
+export const BLOCK_EMERALD_ORE = 64;
+export const BLOCK_LAPIS_ORE = 65;
+export const BLOCK_REDSTONE_ORE = 66;
+export const BLOCK_NETHERRACK = 92;
+export const BLOCK_NETHER_BRICK = 106;
+export const BLOCK_SOUL_SAND = 93;
+export const BLOCK_GLOWSTONE = 91;
+export const BLOCK_QUARTZ_ORE = 102;
+export const BLOCK_OBSIDIAN = 90;
+export const BLOCK_CRYING_OBSIDIAN = 220;
+export const BLOCK_ANCIENT_DEBRIS = 219;
+export const BLOCK_BASALT = 212;
+export const BLOCK_BLACKSTONE = 213;
+export const BLOCK_POLISHED_BLACKSTONE = 214;
+export const BLOCK_POLISHED_BLACKSTONE_BRICKS = 215;
+export const BLOCK_END_STONE = 52;
+export const BLOCK_END_STONE_BRICKS = 53;
+export const BLOCK_PURPUR_BLOCK = 201;
+export const BLOCK_PURPUR_PILLAR = 202;
+export const BLOCK_OAK_PLANKS = 127;
+export const BLOCK_SPRUCE_PLANKS = 128;
+export const BLOCK_BIRCH_PLANKS = 129;
+export const BLOCK_JUNGLE_PLANKS = 130;
+export const BLOCK_ACACIA_PLANKS = 131;
+export const BLOCK_DARK_OAK_PLANKS = 132;
+export const BLOCK_PACKED_ICE = 96;
+export const BLOCK_SNOW_BLOCK = 97;
+export const BLOCK_CLAY_BLOCK = 98;
+export const BLOCK_MELON_BLOCK = 117;
+
+// helper to convert a block ID into one of the keys above for UI purposes
+export function getTextureKeyForBlockId(id) {
+  switch (id) {
+    case BLOCK_DIRT: return 'dirt';
+    case BLOCK_SAND: return 'sand';
+    case BLOCK_GRASS: return 'grassSide';
+    case BLOCK_STONE: return 'stone';
+    case BLOCK_GRAVEL: return 'gravel';
+    case BLOCK_BEDROCK: return 'bedrock';
+    case BLOCK_SNOW: return 'snow';
+    case BLOCK_ICE: return 'ice';
+    case BLOCK_COAL_ORE: return 'coalOre';
+    case BLOCK_IRON_ORE: return 'ironOre';
+    case BLOCK_GOLD_ORE: return 'goldOre';
+    case BLOCK_DIAMOND_ORE: return 'diamondOre';
+    case BLOCK_CACTUS: return 'cactus';
+    case BLOCK_DEAD_BUSH: return 'deadBush';
+    case BLOCK_TALL_GRASS: return 'tallGrass';
+    case BLOCK_ROSE_BUSH: return 'roseBush';
+    case BLOCK_SUNFLOWER: return 'sunflower';
+    default: return null;
+  }
+}
+
+export const BLOCK_LEATHER_BLOCK = 118;
+export const BLOCK_STONE_BRICK_SLAB = 200;
+export const BLOCK_PURPUR_SLAB = 205;
+export const BLOCK_PRISMARINE_SLAB = 206;
+export const BLOCK_DARK_PRISMARINE_SLAB = 207;
+export const BLOCK_PRISMARINE_BRICKS_SLAB = 208;
+export const BLOCK_DISPLAY_CASE_BASE = 214;
+export const BLOCK_DISPLAY_CASE_GLASS = 215;
+export const BLOCK_DISPLAY_CASE_LIGHT = 216;
+export const BLOCK_TITANIUM_BLOCK = 224;
+export const BLOCK_STEEL_BLOCK = 225;
+export const BLOCK_BEDROCK = 14;
+export const BLOCK_CLAY = 15;
+export const BLOCK_RED_SAND = 16;
+export const BLOCK_SNOW = 17;
+export const BLOCK_ICE = 18;
+export const BLOCK_CACTUS = 19;
+export const BLOCK_DEAD_BUSH = 20;
+export const BLOCK_TALL_GRASS = 21;
+export const BLOCK_ROSE_BUSH = 22;
+export const BLOCK_SUNFLOWER = 23;
+
+// Common blocks that will be exposed in the creative inventory
+export const CREATIVE_BLOCKS = [
+  BLOCK_STONE,
+  BLOCK_DIRT,
+  BLOCK_GRASS,
+  BLOCK_SAND,
+  BLOCK_WOOD,
+  BLOCK_LEAVES,
+  BLOCK_GRAVEL,
+  BLOCK_COAL_ORE,
+  BLOCK_IRON_ORE,
+  BLOCK_GOLD_ORE,
+  BLOCK_DIAMOND_ORE,
+  BLOCK_BEDROCK,
+  BLOCK_SNOW,
+  BLOCK_ICE,
+  BLOCK_CACTUS,
+  BLOCK_DEAD_BUSH,
+  BLOCK_TALL_GRASS,
+  BLOCK_ROSE_BUSH,
+  BLOCK_SUNFLOWER
+];
 
 // Cross-model blocks (rendered as X-shaped billboards)
 const CROSS_BLOCKS = new Set([BLOCK_DEAD_BUSH, BLOCK_TALL_GRASS, BLOCK_ROSE_BUSH, BLOCK_SUNFLOWER]);
@@ -219,77 +311,7 @@ export default class ChunkManager {
       return tex;
     };
 
-    // Texture path map (reuse dirt for missing plant assets)
-    const texturePaths = {
-      dirt: 'assets/textures/block/dirt.png',
-      sand: 'assets/textures/block/sand.png',
-      grassSide: 'assets/textures/block/grass_block_side.png',
-      grassSideOverlay: 'assets/textures/block/grass_block_side_overlay.png',
-      grassTop: 'assets/textures/block/grass_block_top.png',
-      stone: 'assets/textures/block/stone.png',
-      gravel: 'assets/textures/block/gravel.png',
-      clay: 'assets/textures/block/clay.png',
-      redSand: 'assets/textures/block/red_sand.png',
-      bedrock: 'assets/textures/block/bedrock.png',
-      snow: 'assets/textures/block/snow.png',
-      ice: 'assets/textures/block/ice.png',
-      coalOre: 'assets/textures/block/coal_ore.png',
-      ironOre: 'assets/textures/block/iron_ore.png',
-      goldOre: 'assets/textures/block/gold_ore.png',
-      diamondOre: 'assets/textures/block/diamond_ore.png',
-      oakSide: 'assets/textures/block/oak_log.png',
-      oakTop: 'assets/textures/block/oak_log_top.png',
-      cactus: 'assets/textures/block/cactus.png',
-      grassSnowSide: 'assets/textures/block/grass_block_snow_side.png',
-      deadBush: 'assets/textures/block/dead_bush.png',
-      tallGrass: 'assets/textures/block/tall_grass_top.png',
-      roseBush: 'assets/textures/block/rose_bush_top.png',
-      sunflower: 'assets/textures/block/sunflower.png',
-      oakLeaves: 'assets/textures/block/oak_leaves.png',
-      waterStill: 'assets/textures/block/water_overlay.png',
-      sun: 'assets/textures/environment/sun.png',
-      emeraldOre: 'assets/textures/block/emerald_ore.png',
-      emeraldBlock: 'assets/textures/block/emerald_block.png',
-      goldBlock: 'assets/textures/block/gold_block.png',
-      ironBlock: 'assets/textures/block/iron_block.png',
-      coalBlock: 'assets/textures/block/coal_block.png',
-      diamondBlock: 'assets/textures/block/diamond_block.png',
-      obsidian: 'assets/textures/block/obsidian.png',
-      glowstone: 'assets/textures/block/glowstone.png',
-      netherrack: 'assets/textures/block/netherrack.png',
-      soulSand: 'assets/textures/block/soul_sand.png',
-      glass: 'assets/textures/block/glass.png',
-      beacon: 'assets/textures/block/beacon.png',
-      cobblestone: 'assets/textures/block/cobblestone.png',
-      mossyCobblestone: 'assets/textures/block/mossy_cobblestone.png',
-      stoneBricks: 'assets/textures/block/stone_bricks.png',
-      mossyStoneBricks: 'assets/textures/block/mossy_stone_bricks.png',
-      crackedStoneBricks: 'assets/textures/block/cracked_stone_bricks.png',
-      chiseledStoneBricks: 'assets/textures/block/chiseled_stone_bricks.png',
-      endStone: 'assets/textures/block/end_stone.png',
-      dragonEgg: 'assets/textures/block/dragon_egg.png',
-      oakPlanks: 'assets/textures/block/oak_planks.png',
-      sprucePlanks: 'assets/textures/block/spruce_planks.png',
-      birchPlanks: 'assets/textures/block/birch_planks.png',
-      junglePlanks: 'assets/textures/block/jungle_planks.png',
-      acaciaPlanks: 'assets/textures/block/acacia_planks.png',
-      darkOakPlanks: 'assets/textures/block/dark_oak_planks.png',
-      packedIce: 'assets/textures/block/packed_ice.png',
-      snowBlock: 'assets/textures/block/snow.png',
-      clayBlock: 'assets/textures/block/clay.png',
-      melonBlock: 'assets/textures/block/melon_side.png',
-      leatherBlock: 'assets/textures/block/brown_wool.png',
-      stoneBrickSlab: 'assets/textures/block/stone_bricks.png',
-      purpurSlab: 'assets/textures/block/purpur_block.png',
-      prismarineSlab: 'assets/textures/block/prismarine.png',
-      darkPrismarineSlab: 'assets/textures/block/dark_prismarine.png',
-      prismarineBricksSlab: 'assets/textures/block/prismarine_bricks.png',
-      displayCaseBase: 'assets/textures/block/stone.png',
-      displayCaseGlass: 'assets/textures/block/glass.png',
-      displayCaseLight: 'assets/textures/block/glowstone.png',
-      titaniumBlock: 'assets/textures/block/iron_block.png',
-      steelBlock: 'assets/textures/block/iron_block.png'
-    };
+    // texturePaths is defined at module scope; reuse that object instead of duplicating it.
 
     const T = {};
     for (const [k, p] of Object.entries(texturePaths)) T[k] = loadTex(p);
