@@ -223,15 +223,12 @@ export default class Inventory {
 
   populateInventory() {
     this.invGrid.innerHTML = '';
-    let items = [];
-    if (this.creative) {
-      items = CREATIVE_BLOCKS.slice();
-    } else {
-      items = this.slots.map(s => s.id);
-    }
+    const totalSlots = 40;
+    const items = this.creative
+      ? CREATIVE_BLOCKS.slice(0, totalSlots)
+      : this.slots.map(s => s.id).concat(Array(totalSlots - this.hotbarSize).fill(BLOCK_AIR));
 
-    const visibleItems = Array.from({ length: 40 }, (_, idx) => items[idx] || BLOCK_AIR);
-    visibleItems.forEach((id, idx) => {
+    Array.from({ length: totalSlots }, (_, idx) => items[idx] || BLOCK_AIR).forEach((id) => {
       const slot = document.createElement('div');
       slot.className = 'inv-slot';
       if (id && id !== BLOCK_AIR) {
