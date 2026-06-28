@@ -71,6 +71,7 @@ export default class Inventory {
 
   _buildHotbarUI() {
     this.hotbarSlots = [];
+    this.inventoryHotbarSlots = [];
     for (let i = 0; i < this.hotbarSize; i++) {
       const slotEl = document.getElementById(`slot-${i}`);
       if (!slotEl) continue;
@@ -80,7 +81,6 @@ export default class Inventory {
     }
 
     this.inventoryHotbarEl = document.getElementById('inventory-hotbar');
-    this.inventoryHotbarSlots = [];
     if (this.inventoryHotbarEl) {
       this.inventoryHotbarEl.innerHTML = '';
       for (let i = 0; i < this.hotbarSize; i++) {
