@@ -32,8 +32,8 @@ export default class Inventory {
 
     // crafting state
     this.craftGrid = new Array(9).fill(null).map(() => ({ id: BLOCK_AIR, count: 0 }));
-
     this.hotbarEl = document.getElementById('hotbar');
+    this.inWorld = false;
     this.setVisible(false);
     this._bindVisibility();
     this._buildHotbarUI();
@@ -46,13 +46,19 @@ export default class Inventory {
     window.addEventListener('blur', updateVisibility);
     window.addEventListener('focus', updateVisibility);
     document.addEventListener('pointerlockchange', updateVisibility);
+    window.addEventListener('game:world-state', (event) => {
+      this.setWorldActive(!!event.detail?.inWorld);
+    });
     updateVisibility();
   }
 
   _shouldShowHotbar() {
-    const mainMenu = document.getElementById('main-menu');
-    const inWorld = !mainMenu || mainMenu.classList.contains('hidden');
-    return inWorld && document.visibilityState !== 'hidden';
+    return this.inWorld && document.visibilityState !== 'hidden';
+  }
+
+  setWorldActive(active) {
+    this.inWorld = active;
+    this.setVisible(this._shouldShowHotbar());
   }
 
   setVisible(visible) {

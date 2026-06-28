@@ -111,7 +111,9 @@ export function initMenu() {
     setTimeout(() => {
       mainMenu.classList.add('hidden');
       if (crosshair) crosshair.style.display = '';
+      window.dispatchEvent(new CustomEvent('game:world-state', { detail: { inWorld: false } }));
       main();
+      window.dispatchEvent(new CustomEvent('game:world-state', { detail: { inWorld: true } }));
     }, 100);
   });
 }
