@@ -34,6 +34,7 @@ export default class Inventory {
     this.craftGrid = new Array(9).fill(null).map(() => ({ id: BLOCK_AIR, count: 0 }));
     this.hotbarEl = document.getElementById('hotbar');
     this.inWorld = false;
+    this.inventoryOpen = false;
     this.setVisible(false);
     this._bindVisibility();
     this._buildHotbarUI();
@@ -53,7 +54,7 @@ export default class Inventory {
   }
 
   _shouldShowHotbar() {
-    return this.inWorld && document.visibilityState !== 'hidden';
+    return this.inWorld && !this.inventoryOpen && document.visibilityState !== 'hidden';
   }
 
   setWorldActive(active) {
@@ -77,6 +78,21 @@ export default class Inventory {
       this.hotbarSlots.push(slotEl);
       this._updateSlotUI(i);
     }
+
+    this.inventoryHotbarEl = document.getElementById('inventory-hotbar');
+    this.inventoryHotbarSlots = [];
+    if (this.inventoryHotbarEl) {
+      this.inventoryHotbarEl.innerHTML = '';
+      for (let i = 0; i < this.hotbarSize; i++) {
+        const slotEl = document.createElement('div');
+        slotEl.className = 'hotbar-slot';
+        slotEl.addEventListener('click', () => this.selectSlot(i));
+        this.inventoryHotbarSlots.push(slotEl);
+        this.inventoryHotbarEl.appendChild(slotEl);
+        this._updateSlotUI(i);
+      }
+    }
+
     // also create inventory grid parent
     this.invOverlay = document.getElementById('inventory');
     this.invGrid = document.getElementById('inventory-grid');
@@ -108,16 +124,22 @@ export default class Inventory {
     }, { passive: false });
   }
 
+  _setSlotSelection(idx, selected) {
+    const hotbarSlot = this.hotbarSlots[idx];
+    if (hotbarSlot) {
+      hotbarSlot.classList.toggle('selected', selected);
+    }
+    const inventorySlot = this.inventoryHotbarSlots[idx];
+    if (inventorySlot) {
+      inventorySlot.classList.toggle('selected', selected);
+    }
+  }
+
   selectSlot(idx) {
     if (idx < 0 || idx >= this.hotbarSize) return;
-    // update selection classes
-    if (this.hotbarSlots[this.selectedIndex]) {
-      this.hotbarSlots[this.selectedIndex].classList.remove('selected');
-    }
+    this._setSlotSelection(this.selectedIndex, false);
     this.selectedIndex = idx;
-    if (this.hotbarSlots[this.selectedIndex]) {
-      this.hotbarSlots[this.selectedIndex].classList.add('selected');
-    }
+    this._setSlotSelection(this.selectedIndex, true);
     // tell interaction which block to place
     const slot = this.slots[this.selectedIndex];
     const id = slot ? slot.id : BLOCK_AIR;
@@ -133,28 +155,30 @@ export default class Inventory {
   }
 
   _updateSlotUI(idx) {
-    const slotEl = this.hotbarSlots[idx];
-    if (!slotEl) return;
-    slotEl.innerHTML = ''; // clear
-    const slot = this.slots[idx];
-    if (slot && slot.id && slot.id !== BLOCK_AIR && slot.count > 0) {
-      const key = getTextureKeyForBlockId(slot.id);
-      if (key && texturePaths[key]) {
-        const img = document.createElement('img');
-        img.src = texturePaths[key];
-        slotEl.appendChild(img);
-        if (slot.count > 1) {
-          const qty = document.createElement('div');
-          qty.textContent = slot.count;
-          qty.style.position = 'absolute';
-          qty.style.bottom = '0';
-          qty.style.right = '2px';
-          qty.style.color = 'white';
-          qty.style.fontSize = '10px';
-          slotEl.appendChild(qty);
+    const slotEls = [this.hotbarSlots[idx], this.inventoryHotbarSlots[idx]];
+    slotEls.forEach(slotEl => {
+      if (!slotEl) return;
+      slotEl.innerHTML = ''; // clear
+      const slot = this.slots[idx];
+      if (slot && slot.id && slot.id !== BLOCK_AIR && slot.count > 0) {
+        const key = getTextureKeyForBlockId(slot.id);
+        if (key && texturePaths[key]) {
+          const img = document.createElement('img');
+          img.src = texturePaths[key];
+          slotEl.appendChild(img);
+          if (slot.count > 1) {
+            const qty = document.createElement('div');
+            qty.textContent = slot.count;
+            qty.style.position = 'absolute';
+            qty.style.bottom = '0';
+            qty.style.right = '2px';
+            qty.style.color = 'white';
+            qty.style.fontSize = '10px';
+            slotEl.appendChild(qty);
+          }
         }
       }
-    }
+    });
   }
 
   toggleInventory() {
@@ -172,14 +196,18 @@ export default class Inventory {
   openInventory() {
     if (!this.invOverlay) return;
     this.closeCrafting();
+    this.inventoryOpen = true;
     this.invOverlay.classList.remove('hidden');
+    this.setVisible(this._shouldShowHotbar());
     this.populateInventory();
   }
 
   closeInventory() {
     if (!this.invOverlay) return;
+    this.inventoryOpen = false;
     this.invOverlay.classList.add('hidden');
     this.invGrid.innerHTML = '';
+    this.setVisible(this._shouldShowHotbar());
   }
 
   toggleCreativeMode() {
@@ -194,7 +222,6 @@ export default class Inventory {
   }
 
   populateInventory() {
-    // simple single-tier inventory: in creative show all blocks, in survival show only hotbar contents
     this.invGrid.innerHTML = '';
     let items = [];
     if (this.creative) {
@@ -203,7 +230,8 @@ export default class Inventory {
       items = this.slots.map(s => s.id);
     }
 
-    items.forEach((id, idx) => {
+    const visibleItems = Array.from({ length: 40 }, (_, idx) => items[idx] || BLOCK_AIR);
+    visibleItems.forEach((id, idx) => {
       const slot = document.createElement('div');
       slot.className = 'inv-slot';
       if (id && id !== BLOCK_AIR) {
@@ -216,7 +244,6 @@ export default class Inventory {
       }
       slot.addEventListener('click', () => {
         if (this.creative && id && id !== BLOCK_AIR) {
-          // put into currently selected hotbar slot
           this.setSlot(this.selectedIndex, id, 1);
           this.selectSlot(this.selectedIndex);
         }
